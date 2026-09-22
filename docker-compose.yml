@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cyber_investigation_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=cyber_investigation
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - EVIDENCE_VAULT_DIR=/app/data/evidence_vault
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+    volumes:
+      - evidence_data:/app/data/evidence_vault
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:7.0
+    container_name: cyber_investigation_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  evidence_data:
+  mongo_data:

@@ -1,0 +1,6 @@
+[2026-06-14 09:42:00] Marcus Vance: Elena, did you manage to get the customer database export from the server?
+[2026-06-14 09:44:15] Elena Rostova: Yes, I used the admin override credentials. The zip file is 450MB.
+[2026-06-14 09:46:00] Marcus Vance: Do not email it directly. Upload to external drive or off-record cloud transfer.
+[2026-06-16 14:15:30] Elena Rostova: Done. File transferred to remote backup. Wire transfer of ,000 should be routed to account +1 415 555 0182.
+[2026-06-16 18:17:00] Marcus Vance: Confirmed. Delete the access logs immediately to wipe our trace from terminal 192.168.1.105.
+[2026-06-18 22:04:00] Elena Rostova: Logs deleted from server. Contact me at m.vance@apex-defense.org if anything fails.
