@@ -82,8 +82,10 @@ async def run_e2e_test():
 
     # 9. Verify AI Insights
     print("\n[Stage 9] Verifying AI Insights:")
-    print(f"    - Summary: {dashboard.ai_insights.summary}")
-    print(f"    - Grounding: {dashboard.ai_insights.confidence_note}")
+    summary_clean = dashboard.ai_insights.summary.encode("ascii", "replace").decode("ascii")
+    note_clean = (dashboard.ai_insights.confidence_note or "").encode("ascii", "replace").decode("ascii")
+    print(f"    - Summary: {summary_clean}")
+    print(f"    - Grounding: {note_clean}")
 
     # 10. Verify ReportLab PDF Generation
     print("\n[Stage 10] Testing PDF Report Generation...")

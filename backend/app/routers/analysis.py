@@ -1,6 +1,8 @@
+import os
 import logging
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, status
+from app.config import settings
 from app.database import get_collection
 from app.schemas.analysis import (
     DashboardResponse, DashboardStats, EntityGroup, KeywordItem,
@@ -49,16 +51,27 @@ async def run_case_analysis(case_id: str):
         path = ev.get("storage_path", "")
         filename = ev.get("original_filename", "Evidence")
         
-        # 1. Text Extraction / OCR
-        ext_res = extract_text_from_file(path, filename)
-        extracted_text = ext_res["extracted_text"]
+        # 1. Text Extraction / OCR (reuse persisted text if file path is unavailable across container restarts)
+        extracted_text = ""
+        extraction_method = ev.get("extraction_method", "Direct Text Stream")
+        if path and os.path.exists(path):
+            ext_res = extract_text_from_file(path, filename)
+            extracted_text = ext_res["extracted_text"]
+            extraction_method = ext_res["extraction_method"]
+        elif ev.get("extracted_text"):
+            extracted_text = ev["extracted_text"]
+            extraction_method = ev.get("extraction_method", "Persisted Forensic Text")
+        elif path:
+            ext_res = extract_text_from_file(path, filename)
+            extracted_text = ext_res["extracted_text"]
+            extraction_method = ext_res["extraction_method"]
         
         # Update evidence document in DB
         await evidence_col.update_one(
             {"evidence_id": ev["evidence_id"]},
             {"$set": {
                 "extracted_text": extracted_text,
-                "extraction_method": ext_res["extraction_method"],
+                "extraction_method": extraction_method,
                 "status": "ANALYZED"
             }}
         )
@@ -221,6 +234,18 @@ async def get_case_dashboard(case_id: str):
 
     cached_analysis = await analysis_col.find_one({"case_id": case_id})
     if cached_analysis:
+        # If cached analysis had Groq offline but Groq is now configured and evidence exists,
+        # dynamically re-run analysis to generate and persist real AI insights
+        cached_ai = cached_analysis.get("ai_insights", {})
+        groq_ready = bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY.strip() != "your_groq_api_key_here")
+        ev_count = await evidence_col.count_documents({"case_id": case_id})
+        if not cached_ai.get("is_available", False) and groq_ready and ev_count > 0:
+            logger.info(f"Cached analysis for case {case_id} had AI offline. Re-running synthesis with active Groq service...")
+            try:
+                return await run_case_analysis(case_id)
+            except Exception as e:
+                logger.warning(f"Auto-refreshing AI analysis failed ({e}); serving existing cached analysis.")
+
         return DashboardResponse(
             case_id=cached_analysis["case_id"],
             title=cached_analysis["title"],

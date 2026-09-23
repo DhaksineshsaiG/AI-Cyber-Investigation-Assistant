@@ -95,18 +95,50 @@ def generate_ai_insights(
             "Provide your forensic analysis strictly in valid JSON format now:"
         )
 
-        model_name = settings.GROQ_MODEL if settings.GROQ_MODEL else "llama-3.3-70b-versatile"
+        candidate_models = []
+        if settings.GROQ_MODEL and settings.GROQ_MODEL.strip():
+            candidate_models.append(settings.GROQ_MODEL.strip())
+        for fallback in [
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant"
+        ]:
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
 
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_content}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=1500
-        )
+        response = None
+        used_model = None
+        last_error = None
+
+        for candidate in candidate_models:
+            try:
+                logger.info(f"Attempting Groq synthesis using model: {candidate}")
+                response = client.chat.completions.create(
+                    model=candidate,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_content}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.2,
+                    max_tokens=1500
+                )
+                used_model = candidate
+                logger.info(f"Successfully generated Groq analysis using model: {candidate}")
+                break
+            except Exception as model_err:
+                err_str = str(model_err).lower()
+                last_error = model_err
+                if any(x in err_str for x in ["model_not_found", "does not exist", "404", "access"]):
+                    logger.warning(f"Groq model '{candidate}' unavailable ({model_err}). Trying fallback...")
+                    continue
+                else:
+                    raise model_err
+
+        if not response:
+            raise last_error or RuntimeError("No Groq model could be reached.")
 
         raw_text = response.choices[0].message.content.strip()
         # Clean markdown codeblocks if enclosed
@@ -120,7 +152,7 @@ def generate_ai_insights(
             "findings": parsed.get("findings", []),
             "patterns": parsed.get("patterns", []),
             "leads": parsed.get("leads", []),
-            "confidence_note": parsed.get("confidence_note", f"Grounded via Groq ({model_name})"),
+            "confidence_note": parsed.get("confidence_note", f"Grounded via Groq ({used_model})"),
             "is_available": True
         }
 
