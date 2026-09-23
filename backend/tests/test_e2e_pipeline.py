@@ -19,7 +19,9 @@ async def run_e2e_test():
     # 1. Connect Database
     print("\n[Stage 1] Connecting Database...")
     await db_manager.connect()
-    print("  [OK] Database initialized successfully.")
+    db_mode = "LIVE MONGODB ATLAS" if db_manager.is_live_mongo else "LOCAL FALLBACK"
+    print(f"  [OK] Database initialized: {db_mode}")
+    assert db_manager.is_live_mongo, "Live MongoDB Atlas connection expected, but fallback was used!"
 
     # 2. Case Creation
     print("\n[Stage 2] Creating Case...")
@@ -34,7 +36,7 @@ async def run_e2e_test():
 
     # 3. Evidence Upload & SHA-256 Hashing
     print("\n[Stage 3] Ingesting Evidence Files...")
-    test_files_dir = Path("test_evidence")
+    test_files_dir = Path(__file__).resolve().parent.parent.parent / "test_evidence"
     filenames = ["whatsapp_chat_export.txt", "security_incident_report.pdf", "security_alert_banner.png"]
 
     upload_files = []

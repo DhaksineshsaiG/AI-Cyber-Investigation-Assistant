@@ -12,8 +12,15 @@ class Settings(BaseSettings):
     MONGODB_URI: str = "mongodb://localhost:27017"
     MONGODB_DB_NAME: str = "cyber_investigation"
 
-    # AI / LLM
-    GEMINI_API_KEY: str = ""
+    # AI / LLM (Groq API)
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GEMINI_API_KEY: str = ""  # Deprecated - replaced by GROQ_API_KEY
+
+    @property
+    def effective_db_name(self) -> str:
+        name = (self.MONGODB_DB_NAME or "").strip()
+        return name if name else "cyber_investigation"
 
     # OCR
     TESSERACT_CMD: str = r"C:\Program Files\Tesseract-OCR\tesseract.exe"

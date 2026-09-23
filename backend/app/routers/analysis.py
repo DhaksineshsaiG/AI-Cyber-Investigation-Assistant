@@ -11,7 +11,7 @@ from app.services.nlp_service import extract_entities_from_text
 from app.services.keyword_service import detect_suspicious_keywords
 from app.services.timeline_service import extract_timeline_events
 from app.services.correlation_service import correlate_cross_evidence
-from app.services.gemini_service import generate_ai_insights
+from app.services.groq_service import generate_ai_insights
 
 logger = logging.getLogger("investigation.analysis")
 router = APIRouter(prefix="/api/cases/{case_id}", tags=["Analysis"])
@@ -137,7 +137,7 @@ async def run_case_analysis(case_id: str):
             ))
             total_entities += len(sorted_items)
 
-    # 6. Gemini AI Investigation Insights
+    # 6. Groq AI Investigation Insights
     ai_insights_res = generate_ai_insights(
         case_id=case_id,
         case_title=case.get("title", ""),

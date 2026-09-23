@@ -1,7 +1,8 @@
 import axios from 'axios';
 import type { CaseItem, EvidenceItem, DashboardData } from '../types/investigation';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const rawApiUrl = import.meta.env.VITE_API_URL;
+const API_BASE_URL = (rawApiUrl ? String(rawApiUrl).trim() : 'http://localhost:8000').replace(/\/+$/, '');
 
 const client = axios.create({
   baseURL: API_BASE_URL,

@@ -1,5 +1,7 @@
 import logging
 from typing import Optional, Any
+from urllib.parse import urlsplit
+import certifi
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 import mongomock
 from app.config import settings
@@ -83,40 +85,50 @@ class DatabaseManager:
     is_live_mongo: bool = False
 
     async def connect(self):
+        db_name = settings.effective_db_name
         # Test if live MongoDB / MongoDB Atlas is accessible
         if settings.MONGODB_URI and not settings.MONGODB_URI.startswith("mongodb://localhost"):
             try:
-                logger.info(f"Connecting to MongoDB Atlas at {settings.MONGODB_URI.split('@')[-1]}...")
-                temp_client = AsyncIOMotorClient(settings.MONGODB_URI, serverSelectionTimeoutMS=3000)
+                parsed_host = urlsplit(settings.MONGODB_URI).netloc.split("@")[-1]
+                logger.info(f"Connecting to MongoDB Atlas cluster at {parsed_host} (database: {db_name})...")
+                temp_client = AsyncIOMotorClient(
+                    settings.MONGODB_URI,
+                    tlsCAFile=certifi.where(),
+                    serverSelectionTimeoutMS=5000
+                )
                 await temp_client.admin.command('ping')
                 self.client = temp_client
-                self.db = self.client[settings.MONGODB_DB_NAME]
+                self.db = self.client[db_name]
                 self.is_live_mongo = True
-                logger.info("Successfully connected to live MongoDB Atlas!")
+                logger.info(f"Successfully connected to live MongoDB Atlas database '{db_name}'!")
                 await self._create_indexes()
                 return
             except Exception as e:
-                logger.warning(f"Failed to connect to configured MongoDB Atlas: {e}. Falling back to resilient local storage.")
+                logger.warning(
+                    f"Unable to connect to live MongoDB Atlas ({e}). "
+                    "Note: Ensure your current public IP is added to the MongoDB Atlas Network Access whitelist. "
+                    "Falling back to resilient local datastore."
+                )
 
         # Fallback if localhost or Atlas unreachable
         try:
             temp_client = AsyncIOMotorClient(settings.MONGODB_URI, serverSelectionTimeoutMS=1500)
             await temp_client.admin.command('ping')
             self.client = temp_client
-            self.db = self.client[settings.MONGODB_DB_NAME]
+            self.db = self.client[db_name]
             self.is_live_mongo = True
-            logger.info("Connected to local MongoDB daemon.")
+            logger.info(f"Connected to local MongoDB daemon (database: {db_name}).")
             await self._create_indexes()
             return
         except Exception:
-            logger.info("MongoDB daemon not active. Initializing resilient high-performance in-memory datastore with auto-persistence.")
+            logger.info(f"Initializing resilient high-performance in-memory datastore (database: {db_name}).")
             mock_client = mongomock.MongoClient()
-            sync_db = mock_client[settings.MONGODB_DB_NAME]
+            sync_db = mock_client[db_name]
             self.db = AsyncMongoMockDatabase(sync_db)
             self.is_live_mongo = False
 
     async def _create_indexes(self):
-        if self.is_live_mongo and self.db:
+        if self.is_live_mongo and self.db is not None:
             try:
                 await self.db["cases"].create_index("case_id", unique=True)
                 await self.db["evidence"].create_index([("case_id", 1), ("evidence_id", 1)])
@@ -127,7 +139,7 @@ class DatabaseManager:
                 logger.warning(f"Index creation notice: {e}")
 
     async def close(self):
-        if self.is_live_mongo and self.client:
+        if self.is_live_mongo and self.client is not None:
             self.client.close()
             logger.info("Closed MongoDB connection.")
 

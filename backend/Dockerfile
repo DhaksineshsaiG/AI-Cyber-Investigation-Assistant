@@ -19,6 +19,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     python -m spacy download en_core_web_sm
 
+# Create evidence vault storage directory
+RUN mkdir -p /app/data/evidence_vault
+
 # Copy backend application code
 COPY app/ ./app/
 
@@ -30,4 +33,4 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

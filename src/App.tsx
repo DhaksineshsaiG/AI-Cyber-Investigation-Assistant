@@ -373,7 +373,7 @@ export default function App() {
               <div className="flex-1">
                 <div className="mb-2 flex justify-between text-sm">
                   <span className="font-semibold text-ink">Processing investigation evidence</span>
-                  <span className="text-teal-700 font-medium">Extracting Text, Running spaCy NER & Gemini AI</span>
+                  <span className="text-teal-700 font-medium">Extracting Text, Running spaCy NER & Groq AI</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full w-2/3 animate-pulse rounded-full bg-teal-500" />
@@ -568,7 +568,7 @@ function ResultsSection({
           </div>
         </article>
 
-        {/* 4. AI Generated Insights (Gemini) */}
+        {/* 4. AI Generated Insights (Groq) */}
         <article className="rounded-2xl border border-slate-200 bg-gradient-to-br from-teal-600 to-cyan-700 p-5 text-white shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2">

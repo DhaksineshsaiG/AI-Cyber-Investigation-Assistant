@@ -49,6 +49,7 @@ async def health_check():
         "status": "healthy",
         "app": settings.APP_NAME,
         "database": "connected (Atlas)" if db_manager.is_live_mongo else "connected (Local Resilient)",
+        "groq_configured": bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY != "your_groq_api_key_here"),
         "gemini_configured": bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY != "your_gemini_api_key_here")
     }
 

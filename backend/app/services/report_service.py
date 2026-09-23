@@ -291,7 +291,7 @@ def build_pdf_report(case_data: Dict[str, Any], evidence_list: List[Dict[str, An
 
     # 8. AI Assistive Investigation Insights
     elements.append(KeepTogether([
-        Paragraph("6. AI ASSISTIVE INVESTIGATION INSIGHTS (GEMINI ENGINE)", section_heading),
+        Paragraph("6. AI ASSISTIVE INVESTIGATION INSIGHTS (GROQ ENGINE)", section_heading),
         Paragraph("<b>NOTICE:</b> The following sections represent AI-generated assistive analysis based strictly on the uploaded evidence. They are intended as investigative leads and require formal investigator verification.", disclaimer_style),
         Spacer(1, 6)
     ]))

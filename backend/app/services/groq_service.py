@@ -4,7 +4,7 @@ import re
 from typing import Dict, Any, List
 from app.config import settings
 
-logger = logging.getLogger("investigation.gemini")
+logger = logging.getLogger("investigation.groq")
 
 def generate_ai_insights(
     case_id: str,
@@ -16,14 +16,15 @@ def generate_ai_insights(
     correlations: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Executes grounded AI analysis via Google Gemini API.
+    Executes grounded AI analysis via Groq API using the official Groq Python SDK.
+    Utilizes high-throughput models (e.g., llama-3.3-70b-versatile) with JSON mode.
     Returns structured assistive investigation insights.
     If API key is missing or invalid, gracefully returns availability status.
     """
-    api_key = settings.GEMINI_API_KEY.strip()
-    if not api_key or api_key == "your_gemini_api_key_here":
+    api_key = settings.GROQ_API_KEY.strip() if settings.GROQ_API_KEY else ""
+    if not api_key or api_key == "your_groq_api_key_here":
         return {
-            "summary": "AI assistive analysis is currently offline. Configure GEMINI_API_KEY in backend/.env to enable automated LLM evidence synthesis.",
+            "summary": "AI assistive analysis is currently offline. Configure GROQ_API_KEY in backend/.env to enable automated LLM evidence synthesis.",
             "findings": [
                 "Deterministic forensic extraction completed (OCR, NER, and Keyword Taxonomy active).",
                 "Review the extracted entities and suspicious keywords in the cards below."
@@ -40,9 +41,9 @@ def generate_ai_insights(
         }
 
     try:
-        from google import genai
+        from groq import Groq
 
-        client = genai.Client(api_key=api_key)
+        client = Groq(api_key=api_key)
 
         # Prepare sanitized evidence context
         evidence_context = {
@@ -74,7 +75,7 @@ def generate_ai_insights(
 
         system_instruction = (
             "You are an expert digital forensics and cybercrime investigation assistant. "
-            "Analyze the provided structured evidence strictly based on the extracted facts. "
+            "Analyze the provided structured evidence strictly based on the extracted facts.\n"
             "CRITICAL RULES:\n"
             "1. Do NOT invent, assume, or fabricate any facts, names, dates, or files not present in the evidence.\n"
             "2. Ground every insight in the provided evidence and cite specific filenames or entities where relevant.\n"
@@ -89,18 +90,25 @@ def generate_ai_insights(
             "}"
         )
 
-        prompt = (
-            f"{system_instruction}\n\n"
+        user_content = (
             f"EVIDENCE DOSSIER:\n{json.dumps(evidence_context, indent=2)}\n\n"
-            "Provide the JSON analysis now:"
+            "Provide your forensic analysis strictly in valid JSON format now:"
         )
 
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
+        model_name = settings.GROQ_MODEL if settings.GROQ_MODEL else "llama-3.3-70b-versatile"
+
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_content}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=1500
         )
 
-        raw_text = response.text.strip()
+        raw_text = response.choices[0].message.content.strip()
         # Clean markdown codeblocks if enclosed
         if raw_text.startswith("```"):
             raw_text = re.sub(r"^```(?:json)?\n?", "", raw_text)
@@ -112,15 +120,15 @@ def generate_ai_insights(
             "findings": parsed.get("findings", []),
             "patterns": parsed.get("patterns", []),
             "leads": parsed.get("leads", []),
-            "confidence_note": parsed.get("confidence_note", "Grounded on extracted evidence"),
+            "confidence_note": parsed.get("confidence_note", f"Grounded via Groq ({model_name})"),
             "is_available": True
         }
 
     except Exception as e:
-        logger.error(f"Gemini API analysis failed: {e}")
+        logger.error(f"Groq API analysis failed: {e}")
         return {
-            "summary": f"AI analysis encountered an error: {str(e)[:100]}. Rule-based extraction remains valid.",
-            "findings": ["Evidence extracted successfully; LLM synthesis unavailable."],
+            "summary": f"AI analysis encountered an issue: {str(e)[:100]}. Rule-based extraction remains valid.",
+            "findings": ["Evidence extracted successfully; Groq LLM synthesis unavailable."],
             "patterns": [],
             "leads": ["Continue manual review of timeline and extracted entities."],
             "confidence_note": "Rule-based analysis",
