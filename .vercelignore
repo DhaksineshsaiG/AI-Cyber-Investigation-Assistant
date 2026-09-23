@@ -1,0 +1,7 @@
+# Ignore backend and non-frontend files for Vercel deployment
+backend/
+test_evidence/
+data/
+*.pptx
+*.py
+*.log

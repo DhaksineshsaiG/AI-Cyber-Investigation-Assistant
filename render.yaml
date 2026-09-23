@@ -21,4 +21,4 @@ services:
       - key: GROQ_MODEL
         value: llama-3.3-70b-versatile
       - key: CORS_ORIGINS
-        value: "http://localhost:5173,http://localhost:3000"
+        value: "https://ai-cyber-investigation-assistant.vercel.app,http://localhost:5173,http://localhost:3000"

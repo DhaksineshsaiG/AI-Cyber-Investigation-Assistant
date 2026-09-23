@@ -30,7 +30,10 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 50
 
     # CORS
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = (
+        "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,"
+        "https://ai-cyber-investigation-assistant.vercel.app"
+    )
 
     @property
     def cors_origin_list(self) -> List[str]:
