@@ -5,8 +5,7 @@ import sys
 
 def verify():
     vercel_urls = [
-        "https://ai-cyber-investigation-assistant.vercel.app",
-        "https://ai-cyber-investigation-assistant-hcayvnkzr-sai-0576.vercel.app"
+        "https://ai-cyber-investigation-assistant.vercel.app"
     ]
     backend_health_url = "https://ai-cyber-investigation-assistant.onrender.com/api/health"
 
