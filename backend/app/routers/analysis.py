@@ -234,17 +234,25 @@ async def get_case_dashboard(case_id: str):
 
     cached_analysis = await analysis_col.find_one({"case_id": case_id})
     if cached_analysis:
-        # If cached analysis had Groq offline but Groq is now configured and evidence exists,
-        # dynamically re-run analysis to generate and persist real AI insights
         cached_ai = cached_analysis.get("ai_insights", {})
+        cached_docs = cached_analysis.get("stats", {}).get("documents", 0)
+        cached_entities = cached_analysis.get("stats", {}).get("key_entities", 0)
         groq_ready = bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY.strip() != "your_groq_api_key_here")
         ev_count = await evidence_col.count_documents({"case_id": case_id})
-        if not cached_ai.get("is_available", False) and groq_ready and ev_count > 0:
-            logger.info(f"Cached analysis for case {case_id} had AI offline. Re-running synthesis with active Groq service...")
+
+        needs_refresh = False
+        if ev_count > 0 and (cached_docs < ev_count or cached_entities == 0):
+            needs_refresh = True
+        elif not cached_ai.get("is_available", False) and groq_ready and ev_count > 0:
+            needs_refresh = True
+
+        if needs_refresh:
+            logger.info(f"Cached analysis for case {case_id} needs refresh (ev_count={ev_count}, docs={cached_docs}, entities={cached_entities}). Re-running forensic pipeline...")
             try:
                 return await run_case_analysis(case_id)
             except Exception as e:
-                logger.warning(f"Auto-refreshing AI analysis failed ({e}); serving existing cached analysis.")
+                logger.warning(f"Auto-refreshing analysis failed ({e}); serving existing cached analysis.")
+
 
         return DashboardResponse(
             case_id=cached_analysis["case_id"],

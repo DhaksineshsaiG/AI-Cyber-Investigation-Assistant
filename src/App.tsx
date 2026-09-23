@@ -1,20 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Activity, AlertTriangle, ArrowRight, Bot, CalendarDays, Check, ChevronRight,
-  Clock3, FileDown, FileText, FolderOpen, Mail, MapPin, Network, Phone, Plus, RefreshCw,
-  ScanText, Search, ShieldCheck, Sparkles, Trash2, Upload, Users, X
+  Activity, AlertTriangle, ArrowRight, Bot, CalendarDays, Check, CheckCircle2, ChevronRight,
+  Clock3, Cpu, ExternalLink, FileDown, FileText, FolderOpen, Mail, MapPin, Maximize2, Network,
+  Phone, Plus, RefreshCw, ScanText, Search, Shield, ShieldAlert, ShieldCheck, Sparkles, Tag,
+  Trash2, Upload, Users, X
 } from 'lucide-react'
 import { api } from './services/api'
 import type { CaseItem, EvidenceItem, DashboardData } from './types/investigation'
-
-const workflow = [
-  'Upload Digital Evidence',
-  'OCR & Text Extraction',
-  'AI & NLP Processing',
-  'LLM Analysis',
-  'Timeline Generation',
-  'Investigation Report'
-]
 
 export default function App() {
   const [currentCase, setCurrentCase] = useState<CaseItem | null>(null)
@@ -29,6 +21,7 @@ export default function App() {
   const [showCaseFilesModal, setShowCaseFilesModal] = useState(false)
   const [showTimelineModal, setShowTimelineModal] = useState(false)
   const [showNewCaseModal, setShowNewCaseModal] = useState(false)
+  const [showAiModal, setShowAiModal] = useState(false)
   const [selectedFilePreview, setSelectedFilePreview] = useState<EvidenceItem | null>(null)
 
   const fileInput = useRef<HTMLInputElement>(null)
@@ -219,23 +212,26 @@ export default function App() {
         )}
 
         {/* Hero Banner */}
-        <section className="mb-8 rounded-2xl bg-navy px-6 py-7 text-white shadow-xl shadow-slate-300/50 sm:px-8">
-          <p className="mb-2 flex items-center gap-2 text-sm font-medium text-teal-300">
-            <Sparkles size={16} /> Investigation workspace
-          </p>
-          <h2 className="max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
+        <section className="mb-8 rounded-2xl bg-gradient-to-r from-navy via-slate-900 to-navy px-6 py-8 text-white shadow-xl shadow-slate-300/40 sm:px-8 border border-slate-800">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-300">
+            <ShieldCheck size={16} /> Digital Forensics & Cyber Intelligence Workspace
+          </div>
+          <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
             Turn complex digital evidence into clear investigative leads.
           </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            Upload case materials to extract entities, identify patterns, and build a defensible timeline—all in one place.
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
+            Upload case materials to extract forensic entities, uncover cross-evidence linkages, identify high-risk anomalies, and generate a defensible chronological timeline backed by grounded AI synthesis.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-2 text-xs text-slate-300">
-            {workflow.map((step, index) => (
-              <span key={step} className="flex items-center gap-2">
-                <span className={index === 0 ? 'font-semibold text-teal-300' : ''}>{step}</span>
-                {index < workflow.length - 1 && <ArrowRight size={13} className="text-slate-500" />}
-              </span>
-            ))}
+          <div className="mt-5 flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-300">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
+              <Shield size={12} className="text-teal-400" /> Cryptographic Integrity (SHA-256)
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
+              <Cpu size={12} className="text-teal-400" /> Multi-Source NER & Risk Taxonomy
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
+              <Bot size={12} className="text-teal-400" /> Grounded AI Assistive Synthesis
+            </span>
           </div>
         </section>
 
@@ -393,6 +389,7 @@ export default function App() {
             currentCase={currentCase}
             onOpenCaseFiles={() => setShowCaseFilesModal(true)}
             onOpenTimeline={() => setShowTimelineModal(true)}
+            onOpenAiModal={() => setShowAiModal(true)}
           />
         )}
       </main>
@@ -411,6 +408,15 @@ export default function App() {
         <FullTimelineModal
           timeline={dashboardData.timeline}
           onClose={() => setShowTimelineModal(false)}
+        />
+      )}
+
+      {/* Fullscreen AI Insights Modal */}
+      {showAiModal && dashboardData && (
+        <AiInsightsModal
+          dashboard={dashboardData}
+          currentCase={currentCase}
+          onClose={() => setShowAiModal(false)}
         />
       )}
 
@@ -433,22 +439,99 @@ export default function App() {
   )
 }
 
+interface ParsedObservation {
+  title: string
+  filename?: string
+  size?: string
+  hash?: string
+  description: string
+  source?: string
+}
+
+function parseObservation(text: string): ParsedObservation {
+  const fileMatch = text.match(/['"]([^'"]+\.(?:png|jpg|jpeg|pdf|txt|csv|log|docx|json))['"]|\b([\w.-]+\.(?:png|jpg|jpeg|pdf|txt|csv|log|docx|json))\b/i)
+  const filename = fileMatch ? (fileMatch[1] || fileMatch[2]) : undefined
+
+  const hashMatch = text.match(/\b([a-f0-9]{64})\b/i)
+  const hash = hashMatch ? hashMatch[1] : undefined
+
+  const sizeMatch = text.match(/\b(\d+(?:,\d+)?\s*(?:bytes|KB|MB|GB))\b/i)
+  const size = sizeMatch ? sizeMatch[1] : undefined
+
+  let title = filename ? filename : 'Forensic Observation'
+  if (!filename && text.includes(':')) {
+    title = text.split(':')[0].trim()
+  }
+
+  let description = text.trim()
+  if (hash) {
+    description = description.replace(new RegExp(`\\(?SHA-?256:?\\s*${hash}\\)?`, 'i'), '').trim()
+  }
+
+  return {
+    title,
+    filename,
+    size,
+    hash,
+    description: description || text.trim(),
+    source: filename,
+  }
+}
+
+function ObservationCard({ text, compact = false }: { text: string; compact?: boolean }) {
+  const obs = parseObservation(text)
+
+  return (
+    <div className={`rounded-xl border border-slate-200 bg-white shadow-2xs hover:border-teal-400/80 transition flex flex-col justify-between ${compact ? 'p-3' : 'p-4'}`}>
+      <div>
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2 mb-2">
+          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 truncate">
+            <Search size={14} className="text-teal-600 shrink-0" />
+            <span className="truncate" title={obs.filename || obs.title}>
+              {obs.filename || obs.title}
+            </span>
+          </div>
+          {obs.size && (
+            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
+              {obs.size}
+            </span>
+          )}
+        </div>
+        <p className={`text-xs leading-relaxed text-slate-600 break-words ${compact ? 'line-clamp-3' : ''}`}>
+          {obs.description}
+        </p>
+      </div>
+
+      {obs.hash && (
+        <div className="mt-2.5 pt-2 border-t border-slate-100 text-[10px] font-mono text-slate-500">
+          <span className="font-semibold text-slate-400 block mb-0.5">SHA-256:</span>
+          <span className="break-all font-mono select-all bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 block" title={obs.hash}>
+            {compact ? `${obs.hash.substring(0, 10)}...${obs.hash.substring(obs.hash.length - 8)}` : obs.hash}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ResultsSection({
   dashboard,
   currentCase,
   onOpenCaseFiles,
-  onOpenTimeline
+  onOpenTimeline,
+  onOpenAiModal
 }: {
   dashboard: DashboardData
   currentCase: CaseItem | null
   onOpenCaseFiles: () => void
   onOpenTimeline: () => void
+  onOpenAiModal: () => void
 }) {
   const hasAnalyzedData = dashboard.stats.documents > 0
 
   return (
     <section>
-      <div className="mb-5 flex items-end justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-teal-700">
             {hasAnalyzedData ? 'Analysis complete' : 'Case workspace initialized'}
@@ -457,168 +540,271 @@ function ResultsSection({
             Evidence analysis dashboard
           </h2>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {currentCase && (
             <button
               onClick={() => window.open(api.getReportPdfUrl(currentCase.case_id), '_blank')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition"
             >
-              <FileDown size={14} /> Export Report
+              <FileDown size={14} /> Export PDF Report
             </button>
           )}
           <button
             onClick={onOpenCaseFiles}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-teal-700"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-500 hover:text-teal-700 transition"
           >
-            <FolderOpen size={17} /> View case files <ChevronRight size={16} />
+            <FolderOpen size={15} /> Case Evidence <ChevronRight size={14} />
           </button>
         </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
         {/* 1. Evidence Summary */}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-ink">Evidence Summary</h3>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-              {dashboard.sources_reviewed_label}
-            </span>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-ink">Evidence Summary</h3>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                {dashboard.sources_reviewed_label}
+              </span>
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-slate-600 break-words">
+              {dashboard.summary}
+            </p>
           </div>
-          <p className="mt-4 text-sm leading-6 text-slate-600">
-            {dashboard.summary}
-          </p>
-          <div className="mt-5 grid grid-cols-3 divide-x divide-slate-100 border-y border-slate-100 py-3 text-center">
-            <Stat value={String(dashboard.stats.documents)} label="Documents" />
-            <Stat value={String(dashboard.stats.key_entities)} label="Key entities" />
-            <Stat value={String(dashboard.stats.risk_signals)} label="Risk signals" />
+          <div className="mt-5 grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 pt-4 text-center">
+            <Stat value={String(dashboard.stats.documents)} label="Documents Analyzed" />
+            <Stat value={String(dashboard.stats.key_entities)} label="Key Entities" />
+            <Stat value={String(dashboard.stats.risk_signals)} label="Risk Signals" />
           </div>
         </article>
 
         {/* 2. Suspicious Keywords */}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-amber-500" />
-            <h3 className="font-bold text-ink">Suspicious Keywords</h3>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={18} className="text-amber-500" />
+                <h3 className="font-bold text-ink">Suspicious Keywords</h3>
+              </div>
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                {dashboard.keywords.length} Found
+              </span>
+            </div>
+            <div className="mt-4 space-y-2 max-h-56 overflow-y-auto pr-1">
+              {dashboard.keywords.length > 0 ? (
+                dashboard.keywords.map((kw) => (
+                  <div
+                    key={kw.keyword}
+                    title={`${kw.category} — ${kw.count} occurrences`}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 text-xs hover:border-slate-300 transition"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`inline-block size-2 rounded-full shrink-0 ${kw.severity === 'high' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                      <span className="font-bold text-slate-800 truncate">{kw.keyword}</span>
+                      <span className="rounded bg-slate-200/80 px-1.5 py-0.2 text-[10px] text-slate-600 font-medium truncate hidden sm:inline-block">
+                        {kw.category}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${kw.severity === 'high' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                        {kw.severity}
+                      </span>
+                      <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-700 border border-slate-200">
+                        ×{kw.count}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-400">
+                  No suspicious keywords flagged in uploaded files.
+                </div>
+              )}
+            </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {dashboard.keywords.length > 0 ? (
-              dashboard.keywords.slice(0, 10).map((kw) => (
-                <span
-                  key={kw.keyword}
-                  title={`${kw.category} (${kw.count} hits)`}
-                  className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${
-                    kw.severity === 'high' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'
-                  }`}
-                >
-                  {kw.keyword} <span className="opacity-75 text-[10px]">({kw.count})</span>
-                </span>
-              ))
-            ) : (
-              <p className="text-xs text-slate-400">No suspicious keywords flagged in uploaded files.</p>
-            )}
-          </div>
-          <p className="mt-4 text-xs leading-5 text-slate-500">
-            Extracted from evidence using the 10-category forensic risk taxonomy.
+          <p className="mt-3 text-xs leading-5 text-slate-400 border-t border-slate-100 pt-2.5">
+            Classified via 10-category forensic cybercrime risk taxonomy.
           </p>
         </article>
 
         {/* 3. Extracted Entities */}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <div className="mb-5 flex items-center gap-2">
-            <Users size={18} className="text-teal-600" />
-            <h3 className="font-bold text-ink">Extracted Entities</h3>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {dashboard.entity_groups.length > 0 ? (
-              dashboard.entity_groups.map((group) => {
-                const Icon = group.category === 'Names' ? Users :
-                             group.category === 'Dates' ? CalendarDays :
-                             group.category === 'Phone Numbers' ? Phone :
-                             group.category === 'Email Addresses' ? Mail :
-                             group.category === 'IP & System Addresses' ? Network : MapPin
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-teal-600" />
+                <h3 className="font-bold text-ink">Extracted Forensic Entities</h3>
+              </div>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                {dashboard.stats.key_entities} Total Extracted
+              </span>
+            </div>
 
-                return (
-                  <div key={group.title} className="rounded-xl border border-slate-100 p-3">
-                    <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                      <span className={`grid size-6 place-items-center rounded-md ${group.tone}`}>
-                        <Icon size={14} />
-                      </span>
-                      {group.title} ({group.items.length})
+            {dashboard.entity_groups && dashboard.entity_groups.some(g => g.items && g.items.length > 0) ? (
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {dashboard.entity_groups.map((group) => {
+                  const Icon = group.category === 'Names' ? Users :
+                               group.category === 'Dates' ? CalendarDays :
+                               group.category === 'Phone Numbers' ? Phone :
+                               group.category === 'Email Addresses' ? Mail :
+                               group.category === 'IP & System Addresses' ? Network : Shield
+
+                  if (!group.items || group.items.length === 0) return null
+
+                  return (
+                    <div key={group.title} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 flex flex-col">
+                      <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-600">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Icon size={14} className="text-teal-600 shrink-0" />
+                          {group.title}
+                        </span>
+                        <span className="rounded-full bg-slate-200/80 px-1.5 py-0.2 text-[10px] font-mono text-slate-700">
+                          {group.items.length}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                        {group.items.map((item) => (
+                          <span
+                            key={item}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700 shadow-2xs hover:border-teal-400 transition max-w-full truncate"
+                            title={item}
+                          >
+                            <span className="truncate">{item}</span>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                      {group.items.slice(0, 8).map((item) => (
-                        <p key={item} className="truncate text-sm text-slate-700" title={item}>
-                          {item}
-                        </p>
-                      ))}
-                      {group.items.length > 8 && (
-                        <p className="text-xs font-semibold text-teal-700">
-                          +{group.items.length - 8} more
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )
-              })
+                  )
+                })}
+              </div>
             ) : (
-              <p className="text-sm text-slate-400 sm:col-span-2">
-                Upload evidence to extract persons, dates, contact records, and system identifiers.
-              </p>
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-8 text-center text-sm text-slate-500">
+                <Users size={28} className="mx-auto text-slate-400 mb-2" />
+                <p className="font-semibold text-slate-600">No entities were extracted from the uploaded evidence.</p>
+                <p className="text-xs text-slate-400 mt-1">Upload raw chat logs, incident memos, or server audit records to detect entities.</p>
+              </div>
             )}
           </div>
+          <p className="mt-4 text-xs text-slate-400 border-t border-slate-100 pt-3">
+            Extracted using regular expressions and natural language entity recognition.
+          </p>
         </article>
 
         {/* 4. AI Generated Insights (Groq) */}
-        <article className="rounded-2xl border border-slate-200 bg-gradient-to-br from-teal-600 to-cyan-700 p-5 text-white shadow-sm flex flex-col justify-between">
+        <article className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-navy to-slate-900 p-5 text-white shadow-md flex flex-col justify-between relative overflow-hidden">
           <div>
-            <div className="flex items-center gap-2">
-              <Sparkles size={18} />
-              <h3 className="font-bold">AI Generated Insights</h3>
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-teal-400" />
+                <h3 className="font-bold text-white text-base">AI Generated Insights</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-teal-500/20 border border-teal-500/40 px-2 py-0.5 text-[10px] font-semibold text-teal-300">
+                  Grounded Synthesis
+                </span>
+                <button
+                  onClick={onOpenAiModal}
+                  title="Expand Fullscreen AI Investigation Dossier"
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+                >
+                  <Maximize2 size={16} />
+                </button>
+              </div>
             </div>
-            <p className="mt-4 text-sm leading-6 text-teal-50">
-              {dashboard.ai_insights.summary}
-            </p>
 
+            {/* Executive Synthesis */}
+            <div className="mt-4 rounded-xl bg-slate-800/60 p-3.5 border border-slate-700/60">
+              <p className="text-xs font-bold uppercase tracking-wider text-teal-300 mb-1.5 flex items-center gap-1.5">
+                <FileText size={13} /> Executive Synthesis
+              </p>
+              <p className="text-xs leading-relaxed text-slate-200 break-words">
+                {dashboard.ai_insights.summary}
+              </p>
+            </div>
+
+            {/* Key Evidence Observations */}
             {dashboard.ai_insights.findings && dashboard.ai_insights.findings.length > 0 && (
-              <div className="mt-4 space-y-1.5 border-t border-teal-500/40 pt-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-teal-200">Key Evidence Observations</p>
-                {dashboard.ai_insights.findings.slice(0, 3).map((f, i) => (
-                  <p key={i} className="text-xs text-teal-100 leading-snug">• {f}</p>
-                ))}
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider text-teal-300">Key Evidence Observations</p>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Showing {Math.min(2, dashboard.ai_insights.findings.length)} of {dashboard.ai_insights.findings.length}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {dashboard.ai_insights.findings.slice(0, 2).map((finding, idx) => (
+                    <ObservationCard key={idx} text={finding} compact={true} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recommended Investigative Follow-up preview */}
+            {dashboard.ai_insights.leads && dashboard.ai_insights.leads.length > 0 && (
+              <div className="mt-4 rounded-xl bg-teal-950/40 border border-teal-800/40 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-teal-300 mb-1 flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-teal-400" /> Recommended Priority Lead
+                </p>
+                <p className="text-xs text-teal-100 leading-snug break-words">
+                  {dashboard.ai_insights.leads[0]}
+                </p>
               </div>
             )}
           </div>
 
-          <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-teal-100 border-t border-teal-500/40 pt-3">
-            <Check size={15} /> {dashboard.ai_insights.confidence_note || 'Evidence grounded analysis'}
+          <div className="mt-4 flex flex-col gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="flex items-center gap-1.5 text-[11px] text-slate-300 truncate max-w-[200px]" title={dashboard.ai_insights.confidence_note}>
+                <Check size={14} className="text-teal-400 shrink-0" />
+                <span className="truncate">{dashboard.ai_insights.confidence_note || 'Evidence grounded analysis'}</span>
+              </span>
+              <button
+                onClick={onOpenAiModal}
+                className="text-xs font-semibold text-teal-300 hover:text-teal-200 transition inline-flex items-center gap-1 shrink-0"
+              >
+                Expand View <ArrowRight size={13} />
+              </button>
+            </div>
           </div>
         </article>
 
         {/* 5. Cross-Evidence Correlation */}
         {dashboard.correlations && dashboard.correlations.length > 0 && (
           <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-3">
-            <div className="mb-4 flex items-center gap-2">
-              <Network size={18} className="text-teal-600" />
-              <h3 className="font-bold text-ink">Cross-Evidence Correlation</h3>
-              <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-700">
-                Multi-source linkages
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Network size={18} className="text-teal-600" />
+                <h3 className="font-bold text-ink">Cross-Evidence Correlation</h3>
+              </div>
+              <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700">
+                {dashboard.correlations.length} Multi-Source Linkages
               </span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {dashboard.correlations.map((corr, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="rounded bg-slate-200/80 px-1.5 py-0.5 font-bold uppercase tracking-wider text-slate-600 text-[10px]">
-                      {corr.entity_type}
-                    </span>
-                    <span className="font-semibold text-teal-700">{corr.occurrences} occurrence(s)</span>
+                <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold uppercase tracking-wider text-slate-600 text-[10px]">
+                        {corr.entity_type}
+                      </span>
+                      <span className="font-semibold text-teal-700 text-xs">{corr.occurrences} file(s)</span>
+                    </div>
+                    <h4 className="mt-1 text-sm font-bold text-slate-800 break-words" title={corr.entity_value}>
+                      {corr.entity_value}
+                    </h4>
                   </div>
-                  <h4 className="mt-2 text-sm font-bold text-slate-800 truncate" title={corr.entity_value}>
-                    {corr.entity_value}
-                  </h4>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Found in: <span className="font-medium text-slate-700">{corr.evidence_names.join(', ')}</span>
-                  </p>
+                  <div className="mt-3 pt-2 border-t border-slate-200/60">
+                    <p className="text-[11px] text-slate-400 font-medium mb-1">Found in sources:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {corr.evidence_names.map((name, i) => (
+                        <span key={i} className="rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 font-medium truncate max-w-full">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -627,7 +813,7 @@ function ResultsSection({
 
         {/* 6. Timeline of Events */}
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-3">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <Clock3 size={18} className="text-teal-600" />
               <h3 className="font-bold text-ink">Timeline of Events</h3>
@@ -644,34 +830,46 @@ function ResultsSection({
               dashboard.timeline.slice(0, 3).map((event, i) => (
                 <div
                   key={`${event.time}-${i}`}
-                  className="relative border-l border-slate-200 pl-5 md:border-l-0 md:border-t md:pt-5 md:pl-0"
+                  className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 flex flex-col justify-between"
                 >
-                  <span className={`absolute -left-1.5 top-0 size-3 rounded-full ${event.color} md:-top-1.5 md:left-0`} />
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{event.time}</p>
-                  <h4 className="mt-2 text-sm font-bold text-slate-800">{event.title}</h4>
-                  <p className="mt-1 text-sm leading-5 text-slate-500 line-clamp-2" title={event.detail}>
-                    {event.detail}
-                  </p>
-                  <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
-                    <span className="truncate">Source: {event.source_evidence}</span>
+                  <div>
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 mb-2">
+                      <span className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                        <span className={`size-2.5 rounded-full ${event.color}`} />
+                        {event.time}
+                      </span>
+                      <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">
+                        {event.title}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm leading-relaxed text-slate-700 break-words mt-2">
+                      {event.detail}
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
+                    <span className="truncate max-w-[200px]" title={event.source_evidence}>
+                      Source: {event.source_evidence}
+                    </span>
                     {event.has_location && <MapPin size={13} className="shrink-0 text-rose-500" />}
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-400 md:col-span-3">
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-400 md:col-span-3">
                 No chronological timestamp markers detected in evidence.
-              </p>
+              </div>
             )}
           </div>
 
           {dashboard.timeline.length > 0 && (
-            <button
-              onClick={onOpenTimeline}
-              className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-800"
-            >
-              Open full timeline ({dashboard.timeline.length} events) <ArrowRight size={16} />
-            </button>
+            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={onOpenTimeline}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 transition"
+              >
+                Open complete timeline view ({dashboard.timeline.length} events) <ArrowRight size={14} />
+              </button>
+            </div>
           )}
         </article>
       </div>
@@ -939,3 +1137,217 @@ function FilePreviewModal({
     </div>
   )
 }
+
+function AiInsightsModal({
+  dashboard,
+  currentCase,
+  onClose
+}: {
+  dashboard: DashboardData
+  currentCase: CaseItem | null
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-6 backdrop-blur-sm">
+      <div className="flex h-full max-h-[90vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-6 py-4 text-white">
+          <div className="flex items-center gap-3">
+            <div className="grid size-9 place-items-center rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30">
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold tracking-tight text-white">
+                  AI Generated Investigation Insights
+                </h3>
+                <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-mono text-teal-300">
+                  Case ID: {currentCase?.case_id || dashboard.case_id}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Grounded digital evidence synthesis & heuristic risk analysis
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {currentCase && (
+              <button
+                onClick={() => window.open(api.getReportPdfUrl(currentCase.case_id), '_blank')}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-teal-300 hover:bg-slate-700 transition"
+              >
+                <FileDown size={14} /> Export Report PDF
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+              title="Close modal"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Body - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+          {/* 1. Executive Synthesis */}
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <FileText size={17} className="text-teal-600" />
+                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                  Executive Synthesis
+                </h4>
+              </div>
+              <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-semibold text-teal-700">
+                Forensic Overview
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-slate-700 break-words whitespace-pre-wrap">
+              {dashboard.ai_insights.summary}
+            </p>
+          </section>
+
+          {/* 2. Key Evidence Observations */}
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Search size={17} className="text-teal-600" />
+                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                  Key Evidence Observations ({dashboard.ai_insights.findings?.length || 0})
+                </h4>
+              </div>
+              <span className="text-xs text-slate-400">Cryptographically verified artifacts</span>
+            </div>
+
+            {dashboard.ai_insights.findings && dashboard.ai_insights.findings.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {dashboard.ai_insights.findings.map((item, idx) => (
+                  <ObservationCard key={idx} text={item} compact={false} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic py-2">No individual observations recorded.</p>
+            )}
+          </section>
+
+          {/* 3. Correlated Findings */}
+          {dashboard.correlations && dashboard.correlations.length > 0 && (
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Network size={17} className="text-teal-600" />
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                    Correlated Cross-Evidence Linkages ({dashboard.correlations.length})
+                  </h4>
+                </div>
+                <span className="text-xs text-teal-600 font-semibold">Multi-source matches</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {dashboard.correlations.map((corr, idx) => (
+                  <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="rounded bg-slate-200 px-1.5 py-0.2 font-mono text-[10px] font-bold text-slate-600 uppercase">
+                          {corr.entity_type}
+                        </span>
+                        <span className="font-semibold text-teal-700 text-xs">
+                          {corr.occurrences} file(s)
+                        </span>
+                      </div>
+                      <p className="font-bold text-slate-800 text-xs break-words">{corr.entity_value}</p>
+                    </div>
+                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
+                      <span className="block text-[10px] uppercase font-semibold text-slate-400 mb-0.5">Sources:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {corr.evidence_names.map((src, i) => (
+                          <span key={i} className="rounded bg-white border border-slate-200 px-1.5 py-0.2 text-[10px] text-slate-600 truncate max-w-full">
+                            {src}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 4. Risk Indicators & Behavioral Patterns */}
+          {dashboard.ai_insights.patterns && dashboard.ai_insights.patterns.length > 0 && (
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert size={17} className="text-amber-500" />
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                    Risk Indicators & Patterns ({dashboard.ai_insights.patterns.length})
+                  </h4>
+                </div>
+                <span className="text-xs text-amber-600 font-semibold">Anomalies</span>
+              </div>
+              <div className="space-y-2">
+                {dashboard.ai_insights.patterns.map((pat, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5 rounded-lg border border-amber-200/70 bg-amber-50/40 p-3 text-xs text-slate-700">
+                    <AlertTriangle size={15} className="shrink-0 text-amber-600 mt-0.5" />
+                    <span className="leading-relaxed break-words">{pat}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 5. Recommended Investigative Follow-ups */}
+          {dashboard.ai_insights.leads && dashboard.ai_insights.leads.length > 0 && (
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={17} className="text-teal-600" />
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                    Recommended Investigative Follow-ups ({dashboard.ai_insights.leads.length})
+                  </h4>
+                </div>
+                <span className="text-xs text-teal-600 font-semibold">Priority Action Items</span>
+              </div>
+              <div className="space-y-2.5">
+                {dashboard.ai_insights.leads.map((lead, idx) => (
+                  <div key={idx} className="flex items-start gap-3 rounded-lg border border-teal-100 bg-teal-50/40 p-3 text-xs text-slate-800">
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-teal-600 text-white font-bold text-[10px]">
+                      {idx + 1}
+                    </span>
+                    <span className="leading-relaxed break-words">{lead}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5">
+          <p className="text-[11px] text-slate-500 italic text-center sm:text-left">
+            AI-generated assistive analysis. Findings require human investigator verification.
+          </p>
+          <div className="flex items-center gap-2">
+            {currentCase && (
+              <button
+                onClick={() => window.open(api.getReportPdfUrl(currentCase.case_id), '_blank')}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-500 hover:text-teal-700 transition"
+              >
+                <FileDown size={14} /> Export PDF
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-lg bg-navy px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
