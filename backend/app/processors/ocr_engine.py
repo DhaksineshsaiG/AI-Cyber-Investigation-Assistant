@@ -50,6 +50,20 @@ def perform_ocr(image_path: str) -> Tuple[str, bool, str]:
 
     try:
         pytesseract.pytesseract.tesseract_cmd = tess_path
+        # Auto-configure TESSDATA_PREFIX if not explicitly set
+        tess_dir = os.path.dirname(tess_path)
+        candidates = [
+            os.path.join(tess_dir, "tessdata"),
+            tess_dir,
+            "/usr/share/tesseract-ocr/4.00/tessdata",
+            "/usr/share/tesseract-ocr/5/tessdata",
+            "/usr/share/tessdata"
+        ]
+        for c in candidates:
+            if os.path.exists(os.path.join(c, "eng.traineddata")):
+                os.environ["TESSDATA_PREFIX"] = c
+                break
+
         with Image.open(image_path) as img:
             processed = preprocess_image(img)
             text = pytesseract.image_to_string(processed, lang='eng', config='--psm 11')
