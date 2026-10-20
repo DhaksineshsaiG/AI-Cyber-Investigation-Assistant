@@ -82,10 +82,25 @@ def extract_text_from_file(file_path: str, original_filename: str) -> Dict[str, 
                 result["extracted_text"] = extracted
                 result["extraction_method"] = "pdf_native"
             else:
-                # Scanned PDF fallback
-                result["extraction_method"] = "pdf_scanned_ocr_needed"
-                result["extracted_text"] = "[Scanned PDF - No embedded text stream found]"
-                result["status"] = "partial"
+                # Scanned PDF fallback: extract page images and execute real OCR
+                scanned_pages_text = []
+                for p_idx, page in enumerate(reader.pages):
+                    page_images = getattr(page, "images", [])
+                    for img_obj in page_images:
+                        raw_bytes = getattr(img_obj, "data", None)
+                        if raw_bytes:
+                            ocr_txt, ocr_ok, _ = perform_ocr(raw_bytes)
+                            if ocr_ok and ocr_txt.strip():
+                                scanned_pages_text.append(ocr_txt.strip())
+
+                if scanned_pages_text:
+                    result["extracted_text"] = "\n\n".join(scanned_pages_text)
+                    result["extraction_method"] = "pdf_scanned_ocr"
+                    result["status"] = "success"
+                else:
+                    result["extraction_method"] = "pdf_scanned_ocr_needed"
+                    result["extracted_text"] = "[Scanned PDF - No embedded text stream or OCR-able images identified]"
+                    result["status"] = "partial"
 
         # 6. Images (OCR)
         elif ext in [".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp"]:

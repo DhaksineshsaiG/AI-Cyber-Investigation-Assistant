@@ -1,7 +1,8 @@
 import logging
 import os
 import shutil
-from typing import Tuple
+import io
+from typing import Tuple, Union
 from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
 from app.config import settings
@@ -37,9 +38,9 @@ def preprocess_image(image: Image.Image) -> Image.Image:
     sharpened = contrasted.filter(ImageFilter.SHARPEN)
     return sharpened
 
-def perform_ocr(image_path: str) -> Tuple[str, bool, str]:
+def perform_ocr(image_input: Union[str, bytes, bytearray, Image.Image]) -> Tuple[str, bool, str]:
     """
-    Performs OCR on an image file.
+    Performs OCR on an image file path, raw image bytes, or PIL Image instance.
     Returns: (extracted_text, is_success, message)
     """
     tess_path = get_tesseract_path()
@@ -64,7 +65,17 @@ def perform_ocr(image_path: str) -> Tuple[str, bool, str]:
                 os.environ["TESSDATA_PREFIX"] = c
                 break
 
-        with Image.open(image_path) as img:
+        if isinstance(image_input, Image.Image):
+            img = image_input
+            should_close = False
+        elif isinstance(image_input, (bytes, bytearray)):
+            img = Image.open(io.BytesIO(image_input))
+            should_close = True
+        else:
+            img = Image.open(str(image_input))
+            should_close = True
+
+        try:
             processed = preprocess_image(img)
             text = pytesseract.image_to_string(processed, lang='eng', config='--psm 11')
             cleaned_text = text.strip()
@@ -74,6 +85,10 @@ def perform_ocr(image_path: str) -> Tuple[str, bool, str]:
                 cleaned_text = text.strip()
             
             return cleaned_text, True, "OCR completed successfully"
+        finally:
+            if should_close:
+                img.close()
     except Exception as e:
-        logger.error(f"OCR execution failed on {image_path}: {e}")
+        input_desc = f"bytes ({len(image_input)} B)" if isinstance(image_input, (bytes, bytearray)) else str(image_input)
+        logger.error(f"OCR execution failed on {input_desc}: {e}")
         return "", False, f"OCR error: {str(e)}"
