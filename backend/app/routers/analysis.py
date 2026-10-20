@@ -1,9 +1,10 @@
 import os
 import logging
 from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from app.config import settings
 from app.database import get_collection
+from app.dependencies import get_current_user, verify_case_access
 from app.schemas.analysis import (
     DashboardResponse, DashboardStats, EntityGroup, KeywordItem,
     TimelineItem, CorrelationItem, AIInsightData
@@ -19,14 +20,14 @@ logger = logging.getLogger("investigation.analysis")
 router = APIRouter(prefix="/api/cases/{case_id}", tags=["Analysis"])
 
 @router.post("/analyze", response_model=DashboardResponse)
-async def run_case_analysis(case_id: str):
+async def run_case_analysis(
+    case_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    case = await verify_case_access(case_id, current_user)
     cases_col = get_collection("cases")
     evidence_col = get_collection("evidence")
     analysis_col = get_collection("analysis")
-
-    case = await cases_col.find_one({"case_id": case_id})
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
 
     evidence_cursor = evidence_col.find({"case_id": case_id})
     evidence_docs = await evidence_cursor.to_list(length=100)
@@ -223,14 +224,13 @@ async def run_case_analysis(case_id: str):
     )
 
 @router.get("/dashboard", response_model=DashboardResponse)
-async def get_case_dashboard(case_id: str):
-    cases_col = get_collection("cases")
+async def get_case_dashboard(
+    case_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    case = await verify_case_access(case_id, current_user)
     analysis_col = get_collection("analysis")
     evidence_col = get_collection("evidence")
-
-    case = await cases_col.find_one({"case_id": case_id})
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
 
     cached_analysis = await analysis_col.find_one({"case_id": case_id})
     if cached_analysis:
@@ -249,7 +249,7 @@ async def get_case_dashboard(case_id: str):
         if needs_refresh:
             logger.info(f"Cached analysis for case {case_id} needs refresh (ev_count={ev_count}, docs={cached_docs}, entities={cached_entities}). Re-running forensic pipeline...")
             try:
-                return await run_case_analysis(case_id)
+                return await run_case_analysis(case_id, current_user)
             except Exception as e:
                 logger.warning(f"Auto-refreshing analysis failed ({e}); serving existing cached analysis.")
 
@@ -273,7 +273,7 @@ async def get_case_dashboard(case_id: str):
     # If no analysis yet, check if evidence exists
     ev_count = await evidence_col.count_documents({"case_id": case_id})
     if ev_count > 0:
-        return await run_case_analysis(case_id)
+        return await run_case_analysis(case_id, current_user)
 
     # Empty initial state
     return DashboardResponse(

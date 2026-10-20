@@ -3,12 +3,16 @@ import {
   Activity, AlertTriangle, ArrowRight, Bot, CalendarDays, Check, CheckCircle2, ChevronRight,
   Clock3, Cpu, ExternalLink, FileDown, FileText, FolderOpen, Mail, MapPin, Maximize2, Network,
   Phone, Plus, RefreshCw, ScanText, Search, Shield, ShieldAlert, ShieldCheck, Sparkles, Tag,
-  Trash2, Upload, Users, X
+  Trash2, Upload, Users, X, LogOut, User as UserIcon
 } from 'lucide-react'
 import { api } from './services/api'
-import type { CaseItem, EvidenceItem, DashboardData } from './types/investigation'
+import type { CaseItem, EvidenceItem, DashboardData, User } from './types/investigation'
+import LoginScreen from './components/LoginScreen'
+import AdminUsersModal from './components/AdminUsersModal'
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(api.getStoredUser())
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(Boolean(api.getStoredToken()))
   const [currentCase, setCurrentCase] = useState<CaseItem | null>(null)
   const [allCases, setAllCases] = useState<CaseItem[]>([])
   const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([])
@@ -16,20 +20,40 @@ export default function App() {
   const [stage, setStage] = useState<'idle' | 'uploading' | 'processing' | 'complete'>('idle')
   const [dragging, setDragging] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
 
   // Modals
   const [showCaseFilesModal, setShowCaseFilesModal] = useState(false)
   const [showTimelineModal, setShowTimelineModal] = useState(false)
   const [showNewCaseModal, setShowNewCaseModal] = useState(false)
   const [showAiModal, setShowAiModal] = useState(false)
+  const [showAdminModal, setShowAdminModal] = useState(false)
+  const [showReassignModal, setShowReassignModal] = useState(false)
+  const [reassignUserId, setReassignUserId] = useState('')
   const [selectedFilePreview, setSelectedFilePreview] = useState<EvidenceItem | null>(null)
 
   const fileInput = useRef<HTMLInputElement>(null)
 
-  // Initialize or fetch active case on mount
+  // Register unauthorized response interceptor and validate session
   useEffect(() => {
-    initApp()
-  }, [])
+    api.setUnauthorizedHandler(() => {
+      setIsAuthenticated(false)
+      setCurrentUser(null)
+      setErrorMessage('Session expired or unauthorized. Please sign in again.')
+    })
+
+    if (isAuthenticated) {
+      api.getMe()
+        .then((user) => {
+          setCurrentUser(user)
+          initApp()
+        })
+        .catch(() => {
+          setIsAuthenticated(false)
+          setCurrentUser(null)
+        })
+    }
+  }, [isAuthenticated])
 
   const initApp = async () => {
     try {
@@ -44,20 +68,82 @@ export default function App() {
         active = cases[0]
       }
 
-      if (!active) {
-        // Create initial production case
-        active = await api.createCase(
-          'Digital Evidence Investigation - Operation Horizon',
-          'Lead Cyber Forensics Unit',
-          'Primary repository case for digital forensics analysis'
-        )
-        setAllCases([active])
+      if (active) {
+        await switchCase(active)
+      } else {
+        setCurrentCase(null)
+        setEvidenceList([])
+        setDashboardData(null)
+        setStage('idle')
       }
-
-      await switchCase(active)
     } catch (err: any) {
       console.error('Failed to initialize case:', err)
-      setErrorMessage(err.message || 'Unable to connect to investigation backend API. Ensure the backend is running.')
+      setErrorMessage(err.response?.data?.detail || err.message || 'Unable to connect to investigation backend API.')
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await api.logout()
+    } finally {
+      setIsAuthenticated(false)
+      setCurrentUser(null)
+      setCurrentCase(null)
+      setAllCases([])
+      setEvidenceList([])
+      setDashboardData(null)
+      localStorage.removeItem('active_case_id')
+    }
+  }
+
+  const handleDownloadPdf = async () => {
+    if (!currentCase) return
+    try {
+      setIsDownloadingPdf(true)
+      setErrorMessage(null)
+      await api.downloadReportPdf(currentCase.case_id)
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.detail || 'Failed to download investigation report PDF.')
+    } finally {
+      setIsDownloadingPdf(false)
+    }
+  }
+
+  const handleDeleteCase = async (caseId: string) => {
+    if (currentUser?.role !== 'admin') return
+    if (!window.confirm(`Are you sure you want to permanently delete case ${caseId}? All associated evidence and analysis records will be permanently erased.`)) {
+      return
+    }
+    try {
+      setErrorMessage(null)
+      await api.deleteCase(caseId)
+      const remaining = allCases.filter(c => c.case_id !== caseId)
+      setAllCases(remaining)
+      if (remaining.length > 0) {
+        await switchCase(remaining[0])
+      } else {
+        setCurrentCase(null)
+        setEvidenceList([])
+        setDashboardData(null)
+        setStage('idle')
+        localStorage.removeItem('active_case_id')
+      }
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.detail || 'Failed to delete case dossier.')
+    }
+  }
+
+  const handleReassignCase = async (targetUserId: string) => {
+    if (!currentCase || currentUser?.role !== 'admin') return
+    try {
+      setErrorMessage(null)
+      const updated = await api.reassignCase(currentCase.case_id, targetUserId.trim())
+      setCurrentCase(updated)
+      setAllCases(prev => prev.map(c => c.case_id === updated.case_id ? updated : c))
+      setShowReassignModal(false)
+      setReassignUserId('')
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.detail || 'Failed to reassign case owner.')
     }
   }
 
@@ -159,11 +245,22 @@ export default function App() {
     }
   }
 
+  if (!isAuthenticated || !currentUser) {
+    return (
+      <LoginScreen
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          setIsAuthenticated(true)
+        }}
+      />
+    )
+  }
+
   return (
     <div className="min-h-screen bg-mist">
       {/* Top Header */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
+      <header className="border-b border-slate-200 bg-white sticky top-0 z-40">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-navy text-white shadow-lg shadow-slate-300/60">
               <ShieldCheck size={22} />
@@ -176,14 +273,27 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {currentUser.role === 'admin' && (
+              <button
+                onClick={() => setShowAdminModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 hover:border-indigo-300"
+                title="Manage system users and access permissions"
+              >
+                <Users size={14} className="text-indigo-600" />
+                <span className="hidden sm:inline">Personnel & Access</span>
+              </button>
+            )}
+
             {currentCase && (
               <button
-                onClick={() => window.open(api.getReportPdfUrl(currentCase.case_id), '_blank')}
-                className="hidden items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-teal-500 hover:bg-teal-50 hover:text-teal-800 sm:flex"
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="hidden items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-teal-500 hover:bg-teal-50 hover:text-teal-800 disabled:opacity-50 sm:flex"
                 title="Download formal forensic investigation report as PDF"
               >
-                <FileDown size={14} className="text-teal-600" /> Export PDF Report
+                <FileDown size={14} className="text-teal-600" />
+                {isDownloadingPdf ? 'Generating PDF...' : 'Export PDF Report'}
               </button>
             )}
 
@@ -193,6 +303,31 @@ export default function App() {
             >
               <Plus size={14} /> New Case
             </button>
+
+            {/* User Profile Pill */}
+            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200">
+              <div className="hidden md:block text-right">
+                <div className="text-xs font-bold text-ink leading-tight">{currentUser.display_name}</div>
+                <div className="text-[10px] text-slate-400 font-mono">@{currentUser.user_id}</div>
+              </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                  currentUser.role === 'admin'
+                    ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                    : 'bg-teal-100 text-teal-800 border border-teal-200'
+                }`}
+              >
+                {currentUser.role}
+              </span>
+
+              <button
+                onClick={handleLogout}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                title="Sign out of investigation session"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -211,59 +346,81 @@ export default function App() {
           </div>
         )}
 
-        {/* Hero Banner */}
-        <section className="mb-8 rounded-2xl bg-gradient-to-r from-navy via-slate-900 to-navy px-6 py-8 text-white shadow-xl shadow-slate-300/40 sm:px-8 border border-slate-800">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-300">
-            <ShieldCheck size={16} /> Digital Forensics & Cyber Intelligence Workspace
+        {!currentCase ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
+            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-slate-100 text-slate-500 mb-4">
+              <FolderOpen size={28} />
+            </div>
+            <h3 className="text-base font-bold text-ink">No Investigation Dossiers Assigned</h3>
+            <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+              {currentUser.role === 'admin'
+                ? "No investigation cases are currently registered. Click 'New Case' to create your first dossier."
+                : "You do not currently own any investigation cases. Click 'New Case' to initiate a case you own."}
+            </p>
+            <button
+              onClick={() => setShowNewCaseModal(true)}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-navy px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              <Plus size={15} /> Create New Case Dossier
+            </button>
           </div>
-          <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
-            Turn complex digital evidence into clear investigative leads.
-          </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
-            Upload case materials to extract forensic entities, uncover cross-evidence linkages, identify high-risk anomalies, and generate a defensible chronological timeline backed by grounded AI synthesis.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-300">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
-              <Shield size={12} className="text-teal-400" /> Cryptographic Integrity (SHA-256)
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
-              <Cpu size={12} className="text-teal-400" /> Multi-Source NER & Risk Taxonomy
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
-              <Bot size={12} className="text-teal-400" /> Grounded AI Assistive Synthesis
-            </span>
-          </div>
-        </section>
-
-        {/* Evidence Intake Section */}
-        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-bold text-ink">Evidence intake</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {currentCase?.title || 'Add files to begin your investigation.'}
+        ) : (
+          <>
+            {/* Hero Banner */}
+            <section className="mb-8 rounded-2xl bg-gradient-to-r from-navy via-slate-900 to-navy px-6 py-8 text-white shadow-xl shadow-slate-300/40 sm:px-8 border border-slate-800">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-300">
+                <ShieldCheck size={16} /> Digital Forensics & Cyber Intelligence Workspace
+              </div>
+              <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
+                Turn complex digital evidence into clear investigative leads.
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
+                Upload case materials to extract forensic entities, uncover cross-evidence linkages, identify high-risk anomalies, and generate a defensible chronological timeline backed by grounded AI synthesis.
               </p>
-            </div>
-            <div className="flex items-center gap-3">
-              {allCases.length > 1 && (
-                <select
-                  value={currentCase?.case_id || ''}
-                  onChange={e => {
-                    const sel = allCases.find(c => c.case_id === e.target.value)
-                    if (sel) switchCase(sel)
-                  }}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                >
-                  {allCases.map(c => (
-                    <option key={c.case_id} value={c.case_id}>{c.case_id} - {c.title.substring(0, 30)}</option>
-                  ))}
-                </select>
-              )}
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                Case ID: {currentCase?.case_id || 'INITIALIZING'}
-              </span>
-            </div>
-          </div>
+              <div className="mt-5 flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
+                  <Shield size={12} className="text-teal-400" /> Cryptographic Integrity (SHA-256)
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
+                  <Cpu size={12} className="text-teal-400" /> Multi-Source NER & Risk Taxonomy
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
+                  <Bot size={12} className="text-teal-400" /> Grounded AI Assistive Synthesis
+                </span>
+              </div>
+            </section>
+
+            {/* Evidence Intake Section */}
+            <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-bold text-ink">Evidence intake</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {currentCase?.title || 'Add files to begin your investigation.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {allCases.length > 1 && (
+                    <select
+                      value={currentCase?.case_id || ''}
+                      onChange={e => {
+                        const sel = allCases.find(c => c.case_id === e.target.value)
+                        if (sel) switchCase(sel)
+                      }}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    >
+                      {allCases.map(c => (
+                        <option key={c.case_id} value={c.case_id}>
+                          {c.case_id} - {c.title.substring(0, 30)}{currentUser.role === 'admin' ? ` (@${c.owner_user_id || 'unassigned'})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    Case ID: {currentCase?.case_id || 'INITIALIZING'}
+                  </span>
+                </div>
+              </div>
 
           {/* Drag & Drop Zone */}
           <div
@@ -390,16 +547,24 @@ export default function App() {
             onOpenCaseFiles={() => setShowCaseFilesModal(true)}
             onOpenTimeline={() => setShowTimelineModal(true)}
             onOpenAiModal={() => setShowAiModal(true)}
+            onExportPdf={handleDownloadPdf}
+            isDownloadingPdf={isDownloadingPdf}
           />
         )}
+        </>
+      )}
       </main>
 
       {/* Case Files Modal */}
       {showCaseFilesModal && (
         <CaseFilesModal
           evidenceList={evidenceList}
+          currentCase={currentCase}
+          currentUser={currentUser}
           onClose={() => setShowCaseFilesModal(false)}
           onSelectPreview={ev => setSelectedFilePreview(ev)}
+          onDeleteCase={handleDeleteCase}
+          onOpenReassign={() => setShowReassignModal(true)}
         />
       )}
 
@@ -417,6 +582,8 @@ export default function App() {
           dashboard={dashboardData}
           currentCase={currentCase}
           onClose={() => setShowAiModal(false)}
+          onExportPdf={handleDownloadPdf}
+          isDownloadingPdf={isDownloadingPdf}
         />
       )}
 
@@ -426,6 +593,63 @@ export default function App() {
           onCreate={handleCreateCase}
           onClose={() => setShowNewCaseModal(false)}
         />
+      )}
+
+      {/* Admin Personnel & Access Modal */}
+      {showAdminModal && currentUser?.role === 'admin' && (
+        <AdminUsersModal
+          currentUser={currentUser}
+          onClose={() => setShowAdminModal(false)}
+        />
+      )}
+
+      {/* Admin Case Reassign Modal */}
+      {showReassignModal && currentCase && currentUser?.role === 'admin' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100">
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-ink">Reassign Case Ownership</h3>
+              <button
+                onClick={() => setShowReassignModal(false)}
+                className="rounded-lg p-1 text-slate-400 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Reassign case <strong className="text-slate-800 font-mono">{currentCase.case_id}</strong> to another registered investigator or admin by their User ID.
+            </p>
+            <form onSubmit={e => { e.preventDefault(); handleReassignCase(reassignUserId) }} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Target User ID</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. investigator_alice"
+                  value={reassignUserId}
+                  onChange={e => setReassignUserId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-teal-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReassignModal(false)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!reassignUserId.trim()}
+                  className="rounded-lg bg-teal-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  Confirm Reassignment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Extracted Text Preview Modal */}
@@ -519,13 +743,17 @@ function ResultsSection({
   currentCase,
   onOpenCaseFiles,
   onOpenTimeline,
-  onOpenAiModal
+  onOpenAiModal,
+  onExportPdf,
+  isDownloadingPdf
 }: {
   dashboard: DashboardData
   currentCase: CaseItem | null
   onOpenCaseFiles: () => void
   onOpenTimeline: () => void
   onOpenAiModal: () => void
+  onExportPdf?: () => void
+  isDownloadingPdf?: boolean
 }) {
   const hasAnalyzedData = dashboard.stats.documents > 0
 
@@ -541,12 +769,13 @@ function ResultsSection({
           </h2>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {currentCase && (
+          {currentCase && onExportPdf && (
             <button
-              onClick={() => window.open(api.getReportPdfUrl(currentCase.case_id), '_blank')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition"
+              onClick={onExportPdf}
+              disabled={isDownloadingPdf}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition disabled:opacity-50"
             >
-              <FileDown size={14} /> Export PDF Report
+              <FileDown size={14} /> {isDownloadingPdf ? 'Exporting PDF...' : 'Export PDF Report'}
             </button>
           )}
           <button
@@ -890,24 +1119,61 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 function CaseFilesModal({
   evidenceList,
+  currentCase,
+  currentUser,
   onClose,
-  onSelectPreview
+  onSelectPreview,
+  onDeleteCase,
+  onOpenReassign
 }: {
   evidenceList: EvidenceItem[]
+  currentCase?: CaseItem | null
+  currentUser?: User | null
   onClose: () => void
   onSelectPreview: (ev: EvidenceItem) => void
+  onDeleteCase?: (caseId: string) => void
+  onOpenReassign?: () => void
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
           <div>
-            <h3 className="text-lg font-bold text-ink">Case Evidence Repository & Chain of Custody</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold text-ink">Case Evidence Repository & Chain of Custody</h3>
+              {currentCase && (
+                <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-700">
+                  Owner: @{currentCase.owner_user_id || 'unassigned'}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500">Verified digital evidence files and cryptographic integrity hashes</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {currentUser?.role === 'admin' && currentCase && (
+              <>
+                {onOpenReassign && (
+                  <button
+                    onClick={onOpenReassign}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Reassign Owner
+                  </button>
+                )}
+                {onDeleteCase && (
+                  <button
+                    onClick={() => { onClose(); onDeleteCase(currentCase.case_id); }}
+                    className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                  >
+                    Delete Case
+                  </button>
+                )}
+              </>
+            )}
+            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto">
@@ -1141,11 +1407,15 @@ function FilePreviewModal({
 function AiInsightsModal({
   dashboard,
   currentCase,
-  onClose
+  onClose,
+  onExportPdf,
+  isDownloadingPdf
 }: {
   dashboard: DashboardData
   currentCase: CaseItem | null
   onClose: () => void
+  onExportPdf?: () => void
+  isDownloadingPdf?: boolean
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-6 backdrop-blur-sm">
@@ -1172,12 +1442,13 @@ function AiInsightsModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {currentCase && (
+            {currentCase && onExportPdf && (
               <button
-                onClick={() => window.open(api.getReportPdfUrl(currentCase.case_id), '_blank')}
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-teal-300 hover:bg-slate-700 transition"
+                onClick={onExportPdf}
+                disabled={isDownloadingPdf}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-teal-300 hover:bg-slate-700 transition disabled:opacity-50"
               >
-                <FileDown size={14} /> Export Report PDF
+                <FileDown size={14} /> {isDownloadingPdf ? 'Exporting...' : 'Export Report PDF'}
               </button>
             )}
             <button
@@ -1330,12 +1601,13 @@ function AiInsightsModal({
             AI-generated assistive analysis. Findings require human investigator verification.
           </p>
           <div className="flex items-center gap-2">
-            {currentCase && (
+            {currentCase && onExportPdf && (
               <button
-                onClick={() => window.open(api.getReportPdfUrl(currentCase.case_id), '_blank')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-500 hover:text-teal-700 transition"
+                onClick={onExportPdf}
+                disabled={isDownloadingPdf}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-500 hover:text-teal-700 transition disabled:opacity-50"
               >
-                <FileDown size={14} /> Export PDF
+                <FileDown size={14} /> {isDownloadingPdf ? 'Exporting...' : 'Export PDF'}
               </button>
             )}
             <button

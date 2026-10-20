@@ -16,9 +16,13 @@ class CaseUpdate(BaseModel):
 class CaseResponse(BaseModel):
     case_id: str
     title: str
+    owner_user_id: Optional[str] = None
     investigator: str
     description: str
     status: str
     created_at: str
     updated_at: str
     evidence_count: int = 0
+
+class CaseReassign(BaseModel):
+    owner_user_id: str = Field(..., min_length=3, max_length=50, description="Target investigator or admin user ID")

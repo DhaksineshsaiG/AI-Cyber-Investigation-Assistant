@@ -17,6 +17,24 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "openai/gpt-oss-120b"
     GEMINI_API_KEY: str = ""  # Deprecated - replaced by GROQ_API_KEY
 
+    # Authentication & Security
+    JWT_SECRET_KEY: str = "dev-insecure-secret-key-replace-in-production-must-be-32-chars"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours forensic session
+    BOOTSTRAP_SECRET_KEY: str = ""  # Secret token required to invoke /api/auth/bootstrap API
+
+    def validate_production_security(self):
+        if self.ENVIRONMENT.lower() == "production":
+            if (
+                not self.JWT_SECRET_KEY
+                or "dev-insecure" in self.JWT_SECRET_KEY
+                or len(self.JWT_SECRET_KEY) < 32
+            ):
+                raise ValueError(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: JWT_SECRET_KEY must be a cryptographically "
+                    "secure secret with at least 32 characters in production environment."
+                )
+
     @property
     def effective_db_name(self) -> str:
         name = (self.MONGODB_DB_NAME or "").strip()

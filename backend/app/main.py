@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import db_manager
-from app.routers import cases, evidence, analysis, reports
+from app.routers import auth, admin, cases, evidence, analysis, reports
 
 # Setup structured logging
 logging.basicConfig(
@@ -16,6 +16,8 @@ logger = logging.getLogger("investigation.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing AI Cyber Investigation Assistant Backend...")
+    # Validate security in production
+    settings.validate_production_security()
     await db_manager.connect()
     yield
     logger.info("Shutting down backend...")
@@ -39,6 +41,8 @@ app.add_middleware(
 )
 
 # Register API Routers
+app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(cases.router)
 app.include_router(evidence.router)
 app.include_router(analysis.router)

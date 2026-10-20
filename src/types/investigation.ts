@@ -1,6 +1,18 @@
+export interface User {
+  user_id: string;
+  display_name: string;
+  role: 'admin' | 'investigator';
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+  last_login_at?: string | null;
+  created_by?: string | null;
+}
+
 export interface CaseItem {
   case_id: string;
   title: string;
+  owner_user_id?: string | null;
   investigator: string;
   description: string;
   status: string;

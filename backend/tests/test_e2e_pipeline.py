@@ -25,12 +25,18 @@ async def run_e2e_test():
 
     # 2. Case Creation
     print("\n[Stage 2] Creating Case...")
+    mock_user = {
+        "user_id": "e2e_investigator",
+        "role": "investigator",
+        "display_name": "Det. R. Kumar (Digital Forensics Unit)",
+        "is_active": True
+    }
     case_in = CaseCreate(
         title="Operation Horizon - Data Breach & Exfiltration",
         investigator="Det. R. Kumar (Digital Forensics Unit)",
         description="Investigation into unauthorized customer database download"
     )
-    case_res = await cases.create_case(case_in)
+    case_res = await cases.create_case(case_in, current_user=mock_user)
     case_id = case_res.case_id
     print(f"  [OK] Case Created: {case_id} ('{case_res.title}')")
 
@@ -47,14 +53,14 @@ async def run_e2e_test():
         f_bytes = open(fpath, "rb")
         upload_files.append(UploadFile(filename=fn, file=f_bytes))
 
-    uploaded_evidence = await evidence.upload_evidence(case_id=case_id, files=upload_files)
+    uploaded_evidence = await evidence.upload_evidence(case_id=case_id, files=upload_files, current_user=mock_user)
     print(f"  [OK] Ingested {len(uploaded_evidence)} evidence files into secure vault:")
     for ev in uploaded_evidence:
         print(f"    - {ev.original_filename} ({ev.file_type}, {ev.file_size} bytes, SHA-256: {ev.sha256_hash[:16]}...)")
 
     # 4. Run Complete Analysis Pipeline
     print("\n[Stage 4] Executing Forensic Pipeline (Extraction, OCR, NLP, Keywords, Timeline, AI)...")
-    dashboard = await analysis.run_case_analysis(case_id=case_id)
+    dashboard = await analysis.run_case_analysis(case_id=case_id, current_user=mock_user)
     print(f"  [OK] Pipeline executed successfully!")
     print(f"    - Documents Analyzed: {dashboard.stats.documents}")
     print(f"    - Key Entities Extracted: {dashboard.stats.key_entities}")
@@ -89,7 +95,7 @@ async def run_e2e_test():
 
     # 10. Verify ReportLab PDF Generation
     print("\n[Stage 10] Testing PDF Report Generation...")
-    pdf_response = await reports.download_case_pdf(case_id=case_id)
+    pdf_response = await reports.download_case_pdf(case_id=case_id, current_user=mock_user)
     chunks = []
     async for chunk in pdf_response.body_iterator:
         chunks.append(chunk)

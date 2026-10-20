@@ -1,7 +1,8 @@
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from app.database import get_collection
+from app.dependencies import get_current_user, verify_case_access
 from app.services.report_service import build_pdf_report
 from app.routers.analysis import get_case_dashboard, run_case_analysis
 
@@ -9,19 +10,19 @@ logger = logging.getLogger("investigation.reports")
 router = APIRouter(prefix="/api/cases/{case_id}/report", tags=["Reports"])
 
 @router.get("/pdf")
-async def download_case_pdf(case_id: str):
+async def download_case_pdf(
+    case_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    case = await verify_case_access(case_id, current_user)
     cases_col = get_collection("cases")
     evidence_col = get_collection("evidence")
-
-    case = await cases_col.find_one({"case_id": case_id})
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
 
     evidence_cursor = evidence_col.find({"case_id": case_id})
     evidence_list = await evidence_cursor.to_list(length=200)
 
     # Get or generate dashboard data
-    dashboard_res = await get_case_dashboard(case_id)
+    dashboard_res = await get_case_dashboard(case_id, current_user)
 
     # Requirement 14: Data Consistency Verification
     # Ensure the PDF uses the genuine, complete analysis data matching the application.
@@ -35,7 +36,7 @@ async def download_case_pdf(case_id: str):
         if docs_analyzed < ev_count or (key_entities == 0 and any(ev.get("extracted_text") for ev in evidence_list)):
             logger.info(f"Re-running case analysis for PDF generation to guarantee data consistency (case {case_id})...")
             try:
-                dashboard_res = await run_case_analysis(case_id)
+                dashboard_res = await run_case_analysis(case_id, current_user)
             except Exception as e:
                 logger.warning(f"Dynamic analysis refresh before PDF export failed ({e}); using existing dashboard data.")
 

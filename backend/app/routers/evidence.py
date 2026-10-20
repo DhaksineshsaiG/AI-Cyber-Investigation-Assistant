@@ -1,13 +1,14 @@
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
 from app.database import get_collection
 from app.schemas.evidence import EvidenceResponse
 from app.utils.hashing import calculate_sha256
 from app.utils.sanitization import generate_evidence_id
 from app.utils.storage import save_evidence_file
+from app.dependencies import get_current_user, verify_case_access
 from app.config import settings
 
 router = APIRouter(prefix="/api/cases/{case_id}/evidence", tags=["Evidence"])
@@ -18,11 +19,13 @@ ALLOWED_EXTENSIONS = {
 }
 
 @router.post("", response_model=List[EvidenceResponse], status_code=status.HTTP_201_CREATED)
-async def upload_evidence(case_id: str, files: List[UploadFile] = File(...)):
-    cases_col = get_collection("cases")
-    case = await cases_col.find_one({"case_id": case_id})
-    if not case:
-        raise HTTPException(status_code=404, detail="Target case not found")
+async def upload_evidence(
+    case_id: str,
+    files: List[UploadFile] = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify caller owns case or is admin
+    await verify_case_access(case_id, current_user)
 
     if not files:
         raise HTTPException(status_code=400, detail="No evidence files submitted")
@@ -32,11 +35,13 @@ async def upload_evidence(case_id: str, files: List[UploadFile] = File(...)):
     max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
 
     for f in files:
-        ext = Path(f.filename or "unknown").suffix.lower()
+        # Sanitize extension and protect against path traversal in filenames
+        clean_name = os.path.basename(f.filename or "evidence_file")
+        ext = Path(clean_name).suffix.lower()
         if ext not in ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file type '{ext}' for file '{f.filename}'. Allowed: PDF, DOCX, TXT, CSV, JSON, PNG, JPG, JPEG, TIFF, EML."
+                detail=f"Unsupported file type '{ext}' for file '{clean_name}'. Allowed: PDF, DOCX, TXT, CSV, JSON, PNG, JPG, JPEG, TIFF, EML."
             )
 
         # Read content bytes
@@ -44,21 +49,21 @@ async def upload_evidence(case_id: str, files: List[UploadFile] = File(...)):
         file_size = len(content)
 
         if file_size == 0:
-            raise HTTPException(status_code=400, detail=f"File '{f.filename}' is empty (0 bytes).")
+            raise HTTPException(status_code=400, detail=f"File '{clean_name}' is empty (0 bytes).")
         if file_size > max_bytes:
-            raise HTTPException(status_code=400, detail=f"File '{f.filename}' exceeds size limit ({settings.MAX_FILE_SIZE_MB}MB).")
+            raise HTTPException(status_code=400, detail=f"File '{clean_name}' exceeds size limit ({settings.MAX_FILE_SIZE_MB}MB).")
 
         evidence_id = generate_evidence_id()
         sha256_hash = calculate_sha256(content)
-        now_iso = datetime.now().isoformat()
+        now_iso = datetime.now(timezone.utc).isoformat()
 
         # Save immutably to vault
-        storage_path = save_evidence_file(case_id, evidence_id, f.filename, content)
+        storage_path = save_evidence_file(case_id, evidence_id, clean_name, content)
 
         doc = {
             "evidence_id": evidence_id,
             "case_id": case_id,
-            "original_filename": f.filename,
+            "original_filename": clean_name,
             "file_type": ext.lstrip('.').upper(),
             "file_size": file_size,
             "sha256_hash": sha256_hash,
@@ -74,7 +79,7 @@ async def upload_evidence(case_id: str, files: List[UploadFile] = File(...)):
         uploaded_results.append(EvidenceResponse(
             evidence_id=evidence_id,
             case_id=case_id,
-            original_filename=f.filename,
+            original_filename=clean_name,
             file_type=doc["file_type"],
             file_size=file_size,
             sha256_hash=sha256_hash,
@@ -87,9 +92,15 @@ async def upload_evidence(case_id: str, files: List[UploadFile] = File(...)):
     return uploaded_results
 
 @router.get("", response_model=List[EvidenceResponse])
-async def list_evidence(case_id: str):
+async def list_evidence(
+    case_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify caller owns case or is admin
+    await verify_case_access(case_id, current_user)
+
     evidence_col = get_collection("evidence")
-    cursor = evidence_col.find({"case_id": case_id})
+    cursor = evidence_col.find({"case_id": case_id}).sort("upload_date", -1)
     docs = await cursor.to_list(length=200)
 
     results = []
@@ -112,17 +123,28 @@ async def list_evidence(case_id: str):
     return results
 
 @router.delete("/{evidence_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_evidence(case_id: str, evidence_id: str):
+async def delete_evidence(
+    case_id: str,
+    evidence_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify caller owns case or is admin
+    await verify_case_access(case_id, current_user)
+
     evidence_col = get_collection("evidence")
     ev = await evidence_col.find_one({"case_id": case_id, "evidence_id": evidence_id})
     if not ev:
-        raise HTTPException(status_code=404, detail="Evidence not found")
+        raise HTTPException(status_code=404, detail="Evidence item not found")
 
     # Clean file from vault if present
     path = ev.get("storage_path")
     if path and os.path.exists(path):
         try:
-            os.remove(path)
+            # Ensure path is within vault directory to prevent path traversal
+            resolved_path = Path(path).resolve()
+            vault_root = Path(settings.EVIDENCE_VAULT_DIR).resolve()
+            if vault_root in resolved_path.parents:
+                os.remove(resolved_path)
         except Exception:
             pass
 

@@ -130,8 +130,15 @@ class DatabaseManager:
     async def _create_indexes(self):
         if self.is_live_mongo and self.db is not None:
             try:
+                # Users index
+                await self.db["users"].create_index("user_id", unique=True)
+                # Cases indexes
                 await self.db["cases"].create_index("case_id", unique=True)
+                await self.db["cases"].create_index("owner_user_id")
+                await self.db["cases"].create_index([("case_id", 1), ("owner_user_id", 1)])
+                # Evidence and analysis indexes
                 await self.db["evidence"].create_index([("case_id", 1), ("evidence_id", 1)])
+                await self.db["analysis"].create_index("case_id", unique=True)
                 await self.db["entities"].create_index([("case_id", 1), ("category", 1)])
                 await self.db["keywords"].create_index([("case_id", 1), ("keyword", 1)])
                 await self.db["timeline"].create_index([("case_id", 1), ("timestamp", 1)])
