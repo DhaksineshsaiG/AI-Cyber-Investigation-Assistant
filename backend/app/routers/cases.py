@@ -8,6 +8,7 @@ from app.database import get_collection
 from app.schemas.case import CaseCreate, CaseUpdate, CaseResponse
 from app.utils.sanitization import generate_case_id
 from app.dependencies import get_current_user, get_current_active_admin, verify_case_access
+from app.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/api/cases", tags=["Cases"])
 
@@ -35,6 +36,17 @@ async def create_case(
     }
 
     await cases_col.insert_one(doc)
+
+    await record_audit_event(
+        actor_user_id=owner_id,
+        actor_role=current_user.get("role", "investigator"),
+        action_type="investigation_created",
+        action_label="Created an investigation",
+        case_id=case_id,
+        details=f"Created investigation '{case_in.title.strip()}'",
+        metadata={"title": case_in.title.strip()},
+        status="success"
+    )
 
     return CaseResponse(
         case_id=case_id,
@@ -124,5 +136,15 @@ async def delete_case(
             shutil.rmtree(vault_path, ignore_errors=True)
         except Exception:
             pass
+
+    await record_audit_event(
+        actor_user_id=admin.get("user_id", "admin"),
+        actor_role=admin.get("role", "admin"),
+        action_type="investigation_deleted",
+        action_label="Deleted an investigation",
+        case_id=case_id,
+        details=f"Permanently deleted investigation '{case_id}' and all associated vault records",
+        status="success"
+    )
 
     return None

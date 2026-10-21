@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from app.database import get_collection
 from app.dependencies import get_current_user, verify_case_access
 from app.services.report_service import build_pdf_report
+from app.services.audit_service import record_audit_event
 from app.routers.analysis import get_case_dashboard, run_case_analysis
 
 logger = logging.getLogger("investigation.reports")
@@ -46,6 +47,18 @@ async def download_case_pdf(
     pdf_buffer = build_pdf_report(case, evidence_list, dashboard_data)
 
     safe_filename = f"Investigation_Report_{case_id}.pdf"
+
+    # Record report generation / download audit event
+    await record_audit_event(
+        actor_user_id=current_user["user_id"],
+        actor_role=current_user.get("role", "investigator"),
+        action_type="report_downloaded",
+        action_label="Generated investigation report",
+        case_id=case_id,
+        details=f"Downloaded formal PDF investigation report for '{case_id}'",
+        metadata={"filename": safe_filename},
+        status="success"
+    )
 
     return StreamingResponse(
         pdf_buffer,

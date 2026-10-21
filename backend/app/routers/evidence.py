@@ -9,6 +9,7 @@ from app.utils.hashing import calculate_sha256
 from app.utils.sanitization import generate_evidence_id
 from app.utils.storage import save_evidence_file
 from app.dependencies import get_current_user, verify_case_access
+from app.services.audit_service import record_audit_event
 from app.config import settings
 
 router = APIRouter(prefix="/api/cases/{case_id}/evidence", tags=["Evidence"])
@@ -75,6 +76,18 @@ async def upload_evidence(
         }
 
         await evidence_col.insert_one(doc)
+
+        # Record individual file upload audit event
+        await record_audit_event(
+            actor_user_id=current_user["user_id"],
+            actor_role=current_user.get("role", "investigator"),
+            action_type="evidence_uploaded",
+            action_label="Uploaded an evidence file",
+            case_id=case_id,
+            details=f"Uploaded evidence '{clean_name}' ({doc['file_type']}, {file_size} bytes, fingerprint {sha256_hash[:12]}...)",
+            metadata={"filename": clean_name, "file_type": doc["file_type"], "file_size": file_size, "sha256_hash": sha256_hash},
+            status="success"
+        )
 
         uploaded_results.append(EvidenceResponse(
             evidence_id=evidence_id,
@@ -149,4 +162,16 @@ async def delete_evidence(
             pass
 
     await evidence_col.delete_one({"case_id": case_id, "evidence_id": evidence_id})
+
+    await record_audit_event(
+        actor_user_id=current_user["user_id"],
+        actor_role=current_user.get("role", "investigator"),
+        action_type="evidence_deleted",
+        action_label="Removed an evidence file",
+        case_id=case_id,
+        details=f"Removed evidence file '{ev.get('original_filename', evidence_id)}' ({ev.get('file_type', 'FILE')})",
+        metadata={"filename": ev.get("original_filename"), "evidence_id": evidence_id},
+        status="success"
+    )
+
     return None

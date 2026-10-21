@@ -51,6 +51,15 @@ async def get_current_active_admin(
 ) -> dict:
     """Ensures caller has the 'admin' role."""
     if current_user.get("role") != "admin":
+        from app.services.audit_service import record_audit_event
+        await record_audit_event(
+            actor_user_id=current_user.get("user_id", "unknown"),
+            actor_role=current_user.get("role", "investigator"),
+            action_type="access_denied",
+            action_label="Administrative access denied",
+            details="Investigator attempted to access administrative resource without authorization",
+            status="failure"
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Administrative privileges required."
@@ -81,6 +90,17 @@ async def verify_case_access(case_id: str, current_user: dict) -> dict:
         return case
 
     # If the case is unassigned or owned by another user, deny access
+    from app.services.audit_service import record_audit_event
+    await record_audit_event(
+        actor_user_id=current_user.get("user_id", "unknown"),
+        actor_role=current_user.get("role", "investigator"),
+        action_type="access_denied",
+        action_label="Investigation access denied",
+        case_id=case_id,
+        details=f"Unauthorized access attempt to investigation '{case_id}'",
+        status="failure"
+    )
+
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Access denied: You do not have permission to access this case."

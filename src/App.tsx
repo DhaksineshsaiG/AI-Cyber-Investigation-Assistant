@@ -10,10 +10,12 @@ import { api } from './services/api'
 import type { CaseItem, EvidenceItem, DashboardData, User } from './types/investigation'
 import LoginScreen from './components/LoginScreen'
 import AdminUsersModal from './components/AdminUsersModal'
+import ActivityMonitor from './components/ActivityMonitor'
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(api.getStoredUser())
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(Boolean(api.getStoredToken()))
+  const [activeView, setActiveView] = useState<'workspace' | 'activity_monitor'>('workspace')
   const [currentCase, setCurrentCase] = useState<CaseItem | null>(null)
   const [allCases, setAllCases] = useState<CaseItem[]>([])
   const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([])
@@ -263,14 +265,37 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold tracking-tight text-[#1F2937] sm:text-base">
-                  AI Cyber Investigation Assistant
-                </h1>
-                <span className="hidden md:inline-flex items-center rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2 py-0.5 text-[10px] font-bold text-[#C8102E]">
-                  Digital Forensics
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveView('workspace')}
+                  className="text-left group cursor-pointer"
+                  title="Return to investigation workspace"
+                >
+                  <h1 className="text-sm font-bold tracking-tight text-[#1F2937] sm:text-base group-hover:text-[#C8102E] transition">
+                    AI Cyber Investigation Assistant
+                  </h1>
+                </button>
+                {currentUser.role === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveView(activeView === 'activity_monitor' ? 'workspace' : 'activity_monitor')}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition border cursor-pointer ${
+                      activeView === 'activity_monitor'
+                        ? 'bg-[#C8102E] text-white border-[#C8102E] shadow-2xs'
+                        : 'bg-[#FFF1F2] border-[#FECDD3] text-[#C8102E] hover:bg-[#FFE4E6]'
+                    }`}
+                    title={activeView === 'activity_monitor' ? 'Return to Investigation Workspace' : 'Open Investigator Activity Monitor'}
+                  >
+                    <Activity size={13} className={activeView === 'activity_monitor' ? 'text-white' : 'text-[#C8102E]'} />
+                    <span>Activity Monitor</span>
+                  </button>
+                )}
               </div>
-              <p className="text-xs text-[#6B7280]">Digital evidence intelligence workspace</p>
+              <p className="text-xs text-[#6B7280]">
+                {activeView === 'activity_monitor' && currentUser.role === 'admin'
+                  ? 'Investigator accountability and security audit monitoring'
+                  : 'Digital evidence intelligence workspace'}
+              </p>
             </div>
           </div>
 
@@ -349,7 +374,12 @@ export default function App() {
           </div>
         )}
 
-        {!currentCase ? (
+        {activeView === 'activity_monitor' && currentUser.role === 'admin' ? (
+          <ActivityMonitor
+            currentUser={currentUser}
+            onBackToWorkspace={() => setActiveView('workspace')}
+          />
+        ) : !currentCase ? (
           <div className="rounded-2xl border border-dashed border-[#E5E7EB] bg-white p-12 text-center shadow-xs">
             <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#FFF1F2] text-[#C8102E] mb-4 border border-[#FECDD3]">
               <FolderOpen size={28} />

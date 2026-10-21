@@ -15,6 +15,7 @@ from app.services.keyword_service import detect_suspicious_keywords
 from app.services.timeline_service import extract_timeline_events
 from app.services.correlation_service import correlate_cross_evidence
 from app.services.groq_service import generate_ai_insights
+from app.services.audit_service import record_audit_event
 
 logger = logging.getLogger("investigation.analysis")
 router = APIRouter(prefix="/api/cases/{case_id}", tags=["Analysis"])
@@ -205,6 +206,18 @@ async def run_case_analysis(
         {"case_id": case_id},
         {"$set": dashboard_data},
         upsert=True
+    )
+
+    # Record analysis run audit event
+    await record_audit_event(
+        actor_user_id=current_user["user_id"],
+        actor_role=current_user.get("role", "investigator"),
+        action_type="analysis_completed",
+        action_label="Started evidence analysis",
+        case_id=case_id,
+        details=f"Analyzed {doc_count} evidence files; extracted {total_entities} entities and {risk_signals_count} potential warning signs",
+        metadata={"documents_analyzed": doc_count, "entities_count": total_entities, "risk_signals_count": risk_signals_count},
+        status="success"
     )
 
     return DashboardResponse(

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { CaseItem, EvidenceItem, DashboardData, User } from '../types/investigation';
+import type { CaseItem, EvidenceItem, DashboardData, User, AuditEvent, AuditEventsResponse, AuditSummary } from '../types/investigation';
 
 const rawApiUrl = import.meta.env.VITE_API_URL;
 const API_BASE_URL = (rawApiUrl ? String(rawApiUrl).trim() : 'http://localhost:8000').replace(/\/+$/, '');
@@ -205,6 +205,54 @@ export const api = {
     const link = document.createElement('a');
     link.href = url;
     link.download = `Investigation_Report_${caseId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Admin Audit & Activity Monitoring Endpoints
+  async getAuditEvents(params?: {
+    investigator_id?: string;
+    action_type?: string;
+    start_date?: string;
+    end_date?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<AuditEventsResponse> {
+    const res = await client.get<AuditEventsResponse>('/api/admin/audit/events', {
+      params,
+    });
+    return res.data;
+  },
+
+  async getAuditSummary(params?: {
+    investigator_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<AuditSummary> {
+    const res = await client.get<AuditSummary>('/api/admin/audit/summary', {
+      params,
+    });
+    return res.data;
+  },
+
+  async downloadAuditReportPdf(params?: {
+    investigator_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<void> {
+    const res = await client.get('/api/admin/audit/report/pdf', {
+      params,
+      responseType: 'blob',
+    });
+    const blob = new Blob([res.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const invLabel = params?.investigator_id && params.investigator_id !== 'all' ? params.investigator_id : 'All_Investigators';
+    link.download = `Activity_Audit_Report_${invLabel}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

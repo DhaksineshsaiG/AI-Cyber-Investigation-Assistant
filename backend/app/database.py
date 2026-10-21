@@ -53,6 +53,10 @@ class AsyncMockCursor:
         self._cursor.limit(*args, **kwargs)
         return self
 
+    def skip(self, *args, **kwargs):
+        self._cursor.skip(*args, **kwargs)
+        return self
+
     async def to_list(self, length=None):
         docs = list(self._cursor)
         if length is not None:
@@ -142,6 +146,13 @@ class DatabaseManager:
                 await self.db["entities"].create_index([("case_id", 1), ("category", 1)])
                 await self.db["keywords"].create_index([("case_id", 1), ("keyword", 1)])
                 await self.db["timeline"].create_index([("case_id", 1), ("timestamp", 1)])
+                # Audit events indexes
+                await self.db["audit_events"].create_index("event_id", unique=True)
+                await self.db["audit_events"].create_index("timestamp")
+                await self.db["audit_events"].create_index("actor_user_id")
+                await self.db["audit_events"].create_index("action_type")
+                await self.db["audit_events"].create_index("case_id")
+                await self.db["audit_events"].create_index([("actor_user_id", 1), ("timestamp", -1)])
             except Exception as e:
                 logger.warning(f"Index creation notice: {e}")
 

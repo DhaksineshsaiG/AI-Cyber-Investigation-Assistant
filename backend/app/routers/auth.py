@@ -9,6 +9,7 @@ from app.dependencies import get_current_user
 from app.utils.security import (
     hash_password, verify_password, create_access_token, login_rate_limiter
 )
+from app.services.audit_service import record_audit_event
 
 logger = logging.getLogger("investigation.auth")
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -32,15 +33,39 @@ async def login(req: LoginRequest):
 
     if not user:
         login_rate_limiter.record_failure(normalized_id)
+        await record_audit_event(
+            actor_user_id=normalized_id,
+            actor_role="anonymous",
+            action_type="login_failure",
+            action_label="Failed sign in attempt",
+            details="Invalid user ID or password provided",
+            status="failure"
+        )
         raise generic_error
 
     # Verify password hash
     if not verify_password(req.password, user.get("password_hash", "")):
         login_rate_limiter.record_failure(normalized_id)
+        await record_audit_event(
+            actor_user_id=normalized_id,
+            actor_role=user.get("role", "investigator"),
+            action_type="login_failure",
+            action_label="Failed sign in attempt",
+            details="Invalid password provided for registered user",
+            status="failure"
+        )
         raise generic_error
 
     # Verify active status
     if not user.get("is_active", True):
+        await record_audit_event(
+            actor_user_id=normalized_id,
+            actor_role=user.get("role", "investigator"),
+            action_type="login_failure",
+            action_label="Failed sign in attempt",
+            details="Sign in attempted on deactivated account",
+            status="failure"
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated. Please contact an administrator."
@@ -61,6 +86,16 @@ async def login(req: LoginRequest):
         "role": user["role"],
         "display_name": user.get("display_name", user["user_id"])
     })
+
+    # Record successful login event
+    await record_audit_event(
+        actor_user_id=user["user_id"],
+        actor_role=user["role"],
+        action_type="login_success",
+        action_label="Signed in",
+        details="User successfully signed in to workspace",
+        status="success"
+    )
 
     return TokenResponse(
         access_token=token,
@@ -85,6 +120,14 @@ async def logout(current_user: dict = Depends(get_current_user)):
     Server logs the intentional logout event without exposing secrets.
     """
     logger.info(f"User '{current_user.get('user_id')}' logged out.")
+    await record_audit_event(
+        actor_user_id=current_user["user_id"],
+        actor_role=current_user.get("role", "investigator"),
+        action_type="logout",
+        action_label="Signed out",
+        details="User initiated workspace sign out",
+        status="success"
+    )
     return {"detail": "Logged out successfully."}
 
 @router.get("/me", response_model=UserResponse)

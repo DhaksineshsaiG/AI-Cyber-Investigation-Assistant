@@ -95,3 +95,37 @@ export interface DashboardData {
   correlations: CorrelationNode[];
   ai_insights: AIInsights;
 }
+
+export interface AuditEvent {
+  event_id: string;
+  timestamp: string;
+  actor_user_id: string;
+  actor_role: string;
+  action_type: string;
+  action_label: string;
+  case_id?: string | null;
+  details: string;
+  status: string;
+  metadata?: Record<string, any>;
+}
+
+export interface AuditEventsResponse {
+  events: AuditEvent[];
+  total_count: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+export interface AuditSummary {
+  total_activities: number;
+  investigations_created: number;
+  evidence_uploaded: number;
+  analysis_runs: number;
+  reports_downloaded: number;
+  account_changes: number;
+  failed_operations: number;
+  period_start?: string | null;
+  period_end?: string | null;
+  investigator_id: string;
+}
