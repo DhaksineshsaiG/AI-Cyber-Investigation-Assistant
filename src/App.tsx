@@ -3,7 +3,8 @@ import {
   Activity, AlertTriangle, ArrowRight, Bot, CalendarDays, Check, CheckCircle2, ChevronRight,
   Clock3, Cpu, ExternalLink, FileDown, FileText, FolderOpen, Mail, MapPin, Maximize2, Network,
   Phone, Plus, RefreshCw, ScanText, Search, Shield, ShieldAlert, ShieldCheck, Sparkles, Tag,
-  Trash2, Upload, Users, X, LogOut, User as UserIcon
+  Trash2, Upload, Users, X, LogOut, User as UserIcon, HelpCircle, ChevronDown, ChevronUp,
+  FileCheck, Info
 } from 'lucide-react'
 import { api } from './services/api'
 import type { CaseItem, EvidenceItem, DashboardData, User } from './types/investigation'
@@ -31,6 +32,7 @@ export default function App() {
   const [showReassignModal, setShowReassignModal] = useState(false)
   const [reassignUserId, setReassignUserId] = useState('')
   const [selectedFilePreview, setSelectedFilePreview] = useState<EvidenceItem | null>(null)
+  const [showLearnMore, setShowLearnMore] = useState(false)
 
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -39,7 +41,7 @@ export default function App() {
     api.setUnauthorizedHandler(() => {
       setIsAuthenticated(false)
       setCurrentUser(null)
-      setErrorMessage('Session expired or unauthorized. Please sign in again.')
+      setErrorMessage('Your session has expired. Please sign in again.')
     })
 
     if (isAuthenticated) {
@@ -77,8 +79,8 @@ export default function App() {
         setStage('idle')
       }
     } catch (err: any) {
-      console.error('Failed to initialize case:', err)
-      setErrorMessage(err.response?.data?.detail || err.message || 'Unable to connect to investigation backend API.')
+      console.error('Failed to initialize investigation:', err)
+      setErrorMessage(err.response?.data?.detail || 'The investigation service is temporarily unavailable.')
     }
   }
 
@@ -103,7 +105,7 @@ export default function App() {
       setErrorMessage(null)
       await api.downloadReportPdf(currentCase.case_id)
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || 'Failed to download investigation report PDF.')
+      setErrorMessage(err.response?.data?.detail || 'Failed to download investigation report.')
     } finally {
       setIsDownloadingPdf(false)
     }
@@ -111,7 +113,7 @@ export default function App() {
 
   const handleDeleteCase = async (caseId: string) => {
     if (currentUser?.role !== 'admin') return
-    if (!window.confirm(`Are you sure you want to permanently delete case ${caseId}? All associated evidence and analysis records will be permanently erased.`)) {
+    if (!window.confirm(`Are you sure you want to permanently delete investigation ${caseId}? All associated evidence and analysis records will be permanently erased.`)) {
       return
     }
     try {
@@ -129,7 +131,7 @@ export default function App() {
         localStorage.removeItem('active_case_id')
       }
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || 'Failed to delete case dossier.')
+      setErrorMessage(err.response?.data?.detail || 'Failed to delete investigation.')
     }
   }
 
@@ -143,7 +145,7 @@ export default function App() {
       setShowReassignModal(false)
       setReassignUserId('')
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || 'Failed to reassign case owner.')
+      setErrorMessage(err.response?.data?.detail || 'Failed to transfer investigation.')
     }
   }
 
@@ -164,8 +166,8 @@ export default function App() {
         setStage('complete')
       }
     } catch (err: any) {
-      console.error('Error switching case:', err)
-      setErrorMessage('Failed to load case data.')
+      console.error('Error switching investigation:', err)
+      setErrorMessage('Failed to load investigation details.')
     }
   }
 
@@ -177,7 +179,7 @@ export default function App() {
       await switchCase(newCase)
       setShowNewCaseModal(false)
     } catch (err: any) {
-      setErrorMessage(err.response?.data?.detail || 'Failed to create new case.')
+      setErrorMessage(err.response?.data?.detail || 'Failed to create new investigation.')
     }
   }
 
@@ -205,6 +207,9 @@ export default function App() {
 
   const handleDeleteEvidence = async (evidenceId: string) => {
     if (!currentCase) return
+    if (!window.confirm('Are you sure you want to remove this evidence file from the investigation?')) {
+      return
+    }
     try {
       await api.deleteEvidence(currentCase.case_id, evidenceId)
       setEvidenceList(prev => prev.filter(e => e.evidence_id !== evidenceId))
@@ -218,7 +223,7 @@ export default function App() {
   const runAnalysis = async () => {
     if (!currentCase) return
     if (evidenceList.length === 0) {
-      setErrorMessage('Please upload at least one evidence file to analyze.')
+      setErrorMessage('Please upload at least one evidence file before starting the investigation.')
       return
     }
 
@@ -235,16 +240,6 @@ export default function App() {
     }
   }
 
-  const getEntityIcon = (title: string) => {
-    switch (title) {
-      case 'Names': return Users
-      case 'Dates': return CalendarDays
-      case 'Phone Numbers': return Phone
-      case 'Email Addresses': return Mail
-      default: return MapPin
-    }
-  }
-
   if (!isAuthenticated || !currentUser) {
     return (
       <LoginScreen
@@ -257,31 +252,38 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-mist">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#1F2937]">
       {/* Top Header */}
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-40">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8">
+      <header className="border-b border-[#E5E7EB] bg-white sticky top-0 z-40 shadow-xs">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          {/* Logo & Platform Name */}
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-navy text-white shadow-lg shadow-slate-300/60">
+            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#C8102E] to-[#A50F26] text-white shadow-sm shadow-red-500/20">
               <ShieldCheck size={22} />
             </div>
             <div>
-              <h1 className="text-sm font-bold tracking-tight text-ink sm:text-base">
-                AI Cyber Investigation Assistant
-              </h1>
-              <p className="text-xs text-slate-500">Digital evidence intelligence workspace</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-bold tracking-tight text-[#1F2937] sm:text-base">
+                  AI Cyber Investigation Assistant
+                </h1>
+                <span className="hidden md:inline-flex items-center rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2 py-0.5 text-[10px] font-bold text-[#C8102E]">
+                  Digital Forensics
+                </span>
+              </div>
+              <p className="text-xs text-[#6B7280]">Digital evidence intelligence workspace</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          {/* Action Bar & User Profile */}
+          <div className="flex items-center gap-2 sm:gap-3">
             {currentUser.role === 'admin' && (
               <button
                 onClick={() => setShowAdminModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 hover:border-indigo-300"
-                title="Manage system users and access permissions"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#FECDD3] bg-[#FFF1F2] px-3 py-1.5 text-xs font-semibold text-[#C8102E] transition hover:bg-[#FFE4E6]"
+                title="Manage user accounts and access permissions"
               >
-                <Users size={14} className="text-indigo-600" />
-                <span className="hidden sm:inline">Personnel & Access</span>
+                <Users size={14} className="text-[#C8102E]" />
+                <span className="hidden sm:inline">Access Permissions</span>
               </button>
             )}
 
@@ -289,41 +291,42 @@ export default function App() {
               <button
                 onClick={handleDownloadPdf}
                 disabled={isDownloadingPdf}
-                className="hidden items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-teal-500 hover:bg-teal-50 hover:text-teal-800 disabled:opacity-50 sm:flex"
-                title="Download formal forensic investigation report as PDF"
+                className="hidden items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs font-semibold text-[#1F2937] transition hover:border-[#C8102E] hover:text-[#C8102E] disabled:opacity-50 sm:flex shadow-2xs"
+                title="Download formal investigation report as PDF"
               >
-                <FileDown size={14} className="text-teal-600" />
-                {isDownloadingPdf ? 'Generating PDF...' : 'Export PDF Report'}
+                <FileDown size={14} className="text-[#C8102E]" />
+                {isDownloadingPdf ? 'Creating Report...' : 'Download Report'}
               </button>
             )}
 
             <button
               onClick={() => setShowNewCaseModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              className="inline-flex items-center gap-1.5 rounded-lg btn-royal px-3.5 py-1.5 text-xs font-semibold shadow-xs transition"
             >
-              <Plus size={14} /> New Case
+              <Plus size={14} /> Start New Investigation
             </button>
 
             {/* User Profile Pill */}
-            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200">
+            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-[#E5E7EB]">
               <div className="hidden md:block text-right">
-                <div className="text-xs font-bold text-ink leading-tight">{currentUser.display_name}</div>
-                <div className="text-[10px] text-slate-400 font-mono">@{currentUser.user_id}</div>
+                <div className="text-xs font-bold text-[#1F2937] leading-tight">{currentUser.display_name}</div>
+                <div className="text-[10px] text-[#6B7280] font-mono">@{currentUser.user_id}</div>
               </div>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                   currentUser.role === 'admin'
-                    ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                    : 'bg-teal-100 text-teal-800 border border-teal-200'
+                    ? 'bg-[#FFF1F2] text-[#C8102E] border border-[#FECDD3]'
+                    : 'bg-slate-100 text-[#1F2937] border border-[#E5E7EB]'
                 }`}
               >
-                {currentUser.role}
+                {currentUser.role === 'admin' ? 'Administrator' : 'Investigator'}
               </span>
 
               <button
                 onClick={handleLogout}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                className="rounded-lg p-1.5 text-[#6B7280] hover:bg-red-50 hover:text-[#C8102E] transition"
                 title="Sign out of investigation session"
+                aria-label="Sign out"
               >
                 <LogOut size={16} />
               </button>
@@ -333,73 +336,147 @@ export default function App() {
       </header>
 
       {/* Main Container */}
-      <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:py-10">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {errorMessage && (
-          <div className="mb-6 flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <div className="mb-6 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 animate-fadeIn">
             <div className="flex items-center gap-2">
-              <AlertTriangle size={18} className="shrink-0 text-rose-600" />
+              <AlertTriangle size={18} className="shrink-0 text-[#C8102E]" />
               <span>{errorMessage}</span>
             </div>
-            <button onClick={() => setErrorMessage(null)} className="text-rose-500 hover:text-rose-800">
+            <button onClick={() => setErrorMessage(null)} className="text-red-600 hover:text-red-900">
               <X size={16} />
             </button>
           </div>
         )}
 
         {!currentCase ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm">
-            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-slate-100 text-slate-500 mb-4">
+          <div className="rounded-2xl border border-dashed border-[#E5E7EB] bg-white p-12 text-center shadow-xs">
+            <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#FFF1F2] text-[#C8102E] mb-4 border border-[#FECDD3]">
               <FolderOpen size={28} />
             </div>
-            <h3 className="text-base font-bold text-ink">No Investigation Dossiers Assigned</h3>
-            <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+            <h3 className="text-base font-bold text-[#1F2937]">No Investigations Found</h3>
+            <p className="mt-1 text-sm text-[#6B7280] max-w-md mx-auto">
               {currentUser.role === 'admin'
-                ? "No investigation cases are currently registered. Click 'New Case' to create your first dossier."
-                : "You do not currently own any investigation cases. Click 'New Case' to initiate a case you own."}
+                ? "No investigations are currently registered. Click 'Start New Investigation' to create the first dossier."
+                : "You do not currently have any active investigations assigned. Click 'Start New Investigation' to begin."}
             </p>
             <button
               onClick={() => setShowNewCaseModal(true)}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-navy px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl btn-royal px-4 py-2 text-xs font-semibold shadow-xs transition"
             >
-              <Plus size={15} /> Create New Case Dossier
+              <Plus size={15} /> Start New Investigation
             </button>
           </div>
         ) : (
           <>
-            {/* Hero Banner */}
-            <section className="mb-8 rounded-2xl bg-gradient-to-r from-navy via-slate-900 to-navy px-6 py-8 text-white shadow-xl shadow-slate-300/40 sm:px-8 border border-slate-800">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-300">
-                <ShieldCheck size={16} /> Digital Forensics & Cyber Intelligence Workspace
+            {/* Overview Banner (Pure White + Royal Red Accent) */}
+            <section className="mb-6 rounded-2xl bg-white p-6 shadow-xs border border-[#E5E7EB] border-l-4 border-l-[#C8102E]">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#C8102E]">
+                    <ShieldCheck size={16} /> Digital Evidence & Investigation Workspace
+                  </div>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-[#1F2937] sm:text-2xl">
+                    Turn complex digital evidence into clear investigative leads.
+                  </h2>
+                  <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-[#6B7280]">
+                    Upload documents, images, and chat logs to identify people, places and organisations, uncover possible connections, spot potential warning signs, and build an event timeline backed by grounded AI synthesis.
+                  </p>
+                </div>
+                <div className="flex flex-row md:flex-col gap-2 shrink-0">
+                  <button
+                    onClick={() => setShowLearnMore(!showLearnMore)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-1.5 text-xs font-semibold text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E] transition"
+                  >
+                    <HelpCircle size={14} className="text-[#C8102E]" />
+                    <span>{showLearnMore ? 'Hide Details' : 'Learn More'}</span>
+                    {showLearnMore ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                </div>
               </div>
-              <h2 className="mt-3 max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl">
-                Turn complex digital evidence into clear investigative leads.
-              </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
-                Upload case materials to extract forensic entities, uncover cross-evidence linkages, identify high-risk anomalies, and generate a defensible chronological timeline backed by grounded AI synthesis.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-300">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
-                  <Shield size={12} className="text-teal-400" /> Cryptographic Integrity (SHA-256)
+
+              {/* Expandable Educational Details */}
+              {showLearnMore && (
+                <div className="mt-4 pt-4 border-t border-[#E5E7EB] grid gap-3 sm:grid-cols-3 text-xs">
+                  <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-3.5">
+                    <div className="font-bold text-[#1F2937] flex items-center gap-1.5 mb-1 text-[#C8102E]">
+                      <FileCheck size={14} /> File Integrity Check
+                    </div>
+                    <p className="text-[#6B7280] leading-relaxed">
+                      Checks whether the file's digital fingerprint matches the recorded value. This can help identify changes to a file.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-3.5">
+                    <div className="font-bold text-[#1F2937] flex items-center gap-1.5 mb-1 text-[#C8102E]">
+                      <AlertTriangle size={14} /> Potential Warning Signs
+                    </div>
+                    <p className="text-[#6B7280] leading-relaxed">
+                      Highlights patterns that may deserve closer examination. These are indicators, not proof of wrongdoing.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-3.5">
+                    <div className="font-bold text-[#1F2937] flex items-center gap-1.5 mb-1 text-[#C8102E]">
+                      <Bot size={14} /> AI Investigation Summary
+                    </div>
+                    <p className="text-[#6B7280] leading-relaxed">
+                      An AI-generated overview of the available evidence, findings and possible connections. Always review supporting evidence before drawing conclusions.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Feature Pills */}
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[#6B7280]">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] px-3 py-1 font-medium border border-[#E5E7EB]">
+                  <Shield size={12} className="text-[#C8102E]" /> Digital File Fingerprints (SHA-256)
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
-                  <Cpu size={12} className="text-teal-400" /> Multi-Source NER & Risk Taxonomy
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] px-3 py-1 font-medium border border-[#E5E7EB]">
+                  <Users size={12} className="text-[#C8102E]" /> People, Places & Organisations
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800/80 px-3 py-1 font-medium border border-slate-700/60">
-                  <Bot size={12} className="text-teal-400" /> Grounded AI Assistive Synthesis
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] px-3 py-1 font-medium border border-[#E5E7EB]">
+                  <Sparkles size={12} className="text-[#C8102E]" /> Grounded AI Investigation Summary
                 </span>
               </div>
             </section>
 
+            {/* Quick Live Statistics Bar */}
+            <section className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-xs">
+                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">My Investigations</div>
+                <div className="mt-1 text-2xl font-bold text-[#1F2937]">{allCases.length}</div>
+                <div className="mt-0.5 text-[11px] text-[#6B7280]">Active dossiers in system</div>
+              </div>
+              <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-xs">
+                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Evidence Files</div>
+                <div className="mt-1 text-2xl font-bold text-[#C8102E]">{evidenceList.length}</div>
+                <div className="mt-0.5 text-[11px] text-[#6B7280]">Uploaded for this case</div>
+              </div>
+              <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-xs">
+                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Progress</div>
+                <div className="mt-1 text-2xl font-bold text-[#1F2937]">
+                  {dashboardData && dashboardData.stats.documents > 0 ? 'Examined' : 'Awaiting Review'}
+                </div>
+                <div className="mt-0.5 text-[11px] text-[#6B7280]">
+                  {dashboardData?.stats.documents || 0} files examined
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-xs">
+                <div className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wider">Potential Warning Signs</div>
+                <div className="mt-1 text-2xl font-bold text-[#D97706]">{dashboardData?.stats.risk_signals || 0}</div>
+                <div className="mt-0.5 text-[11px] text-[#6B7280]">Flagged for verification</div>
+              </div>
+            </section>
+
             {/* Evidence Intake Section */}
-            <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <section className="mb-8 rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-xs sm:p-6">
+              <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="font-bold text-ink">Evidence intake</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {currentCase?.title || 'Add files to begin your investigation.'}
+                  <h2 className="text-lg font-bold text-[#1F2937]">Upload Evidence</h2>
+                  <p className="mt-0.5 text-xs text-[#6B7280]">
+                    Upload documents, images and other supported files for examination.
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   {allCases.length > 1 && (
                     <select
                       value={currentCase?.case_id || ''}
@@ -407,155 +484,164 @@ export default function App() {
                         const sel = allCases.find(c => c.case_id === e.target.value)
                         if (sel) switchCase(sel)
                       }}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      className="rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-semibold text-[#1F2937] focus:outline-none focus:border-[#C8102E]"
                     >
                       {allCases.map(c => (
                         <option key={c.case_id} value={c.case_id}>
-                          {c.case_id} - {c.title.substring(0, 30)}{currentUser.role === 'admin' ? ` (@${c.owner_user_id || 'unassigned'})` : ''}
+                          {c.case_id} - {c.title.substring(0, 32)}{currentUser.role === 'admin' ? ` (@${c.owner_user_id || 'unassigned'})` : ''}
                         </option>
                       ))}
                     </select>
                   )}
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                    Case ID: {currentCase?.case_id || 'INITIALIZING'}
+                  <span className="rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-3 py-1 text-xs font-bold text-[#C8102E]">
+                    Investigation ID: {currentCase?.case_id || 'INITIALIZING'}
                   </span>
                 </div>
               </div>
 
-          {/* Drag & Drop Zone */}
-          <div
-            onDragOver={e => { e.preventDefault(); setDragging(true) }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={e => { e.preventDefault(); setDragging(false); handleFilesUpload(e.dataTransfer.files) }}
-            onClick={() => fileInput.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed px-5 py-9 text-center transition ${
-              dragging ? 'border-teal-500 bg-teal-50' : 'border-slate-200 bg-slate-50 hover:border-teal-400 hover:bg-teal-50/40'
-            }`}
-          >
-            <div className="mx-auto mb-3 grid size-11 place-items-center rounded-full bg-teal-100 text-teal-700">
-              <Upload size={20} />
-            </div>
-            <p className="text-sm font-semibold text-slate-700">
-              Drop evidence files here, or <span className="text-teal-700">browse files</span>
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              PDF, DOCX, TXT, CSV, JSON, images (PNG, JPG), chat logs, and emails
-            </p>
-            <input
-              ref={fileInput}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={e => e.target.files && handleFilesUpload(e.target.files)}
-            />
-          </div>
+              {/* Drag & Drop Zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragging(true) }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={e => { e.preventDefault(); setDragging(false); handleFilesUpload(e.dataTransfer.files) }}
+                onClick={() => fileInput.current?.click()}
+                className={`cursor-pointer rounded-xl border-2 border-dashed px-5 py-8 text-center transition ${
+                  dragging ? 'border-[#C8102E] bg-[#FFF1F2]' : 'border-[#E5E7EB] bg-[#F8FAFC] hover:border-[#FECDD3] hover:bg-[#FFF1F2]/50'
+                }`}
+              >
+                <div className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-[#FFF1F2] text-[#C8102E] border border-[#FECDD3]">
+                  <Upload size={22} />
+                </div>
+                <p className="text-sm font-semibold text-[#1F2937]">
+                  Drop evidence files here, or <span className="text-[#C8102E] underline">browse files</span>
+                </p>
+                <p className="mt-1.5 text-xs text-[#6B7280]">
+                  Supported file formats: PDF, DOCX, TXT, CSV, JSON, images (PNG, JPG), chat logs, and emails (up to 50MB per file)
+                </p>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={e => e.target.files && handleFilesUpload(e.target.files)}
+                />
+              </div>
 
-          {/* Ingested Evidence List */}
-          {evidenceList.length > 0 && (
-            <div className="mt-4 space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Ingested Evidence Vault ({evidenceList.length} files)
-              </p>
-              {evidenceList.map(ev => (
-                <div key={ev.evidence_id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                  <span className="flex min-w-0 items-center gap-2 text-slate-700">
-                    <FileText size={16} className="shrink-0 text-teal-600" />
-                    <span className="truncate font-medium">{ev.original_filename}</span>
-                    <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                      {ev.file_type}
-                    </span>
-                    <span className="text-xs text-slate-400">{(ev.file_size / 1024).toFixed(0)} KB</span>
-                    <span className="hidden font-mono text-[10px] text-slate-400 md:inline" title={ev.sha256_hash}>
-                      SHA-256: {ev.sha256_hash.substring(0, 12)}...
-                    </span>
-                  </span>
-                  <div className="flex items-center gap-1">
+              {/* Uploaded Evidence Vault */}
+              {evidenceList.length > 0 && (
+                <div className="mt-5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">
+                      Uploaded Evidence ({evidenceList.length} files)
+                    </p>
                     <button
-                      onClick={e => { e.stopPropagation(); setSelectedFilePreview(ev) }}
-                      className="rounded px-2 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+                      onClick={() => setShowCaseFilesModal(true)}
+                      className="text-xs font-semibold text-[#C8102E] hover:underline"
                     >
-                      View
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); handleDeleteEvidence(ev.evidence_id) }}
-                      className="p-1 text-slate-400 hover:text-rose-500"
-                      title="Remove file"
-                    >
-                      <Trash2 size={15} />
+                      View All in Evidence Handling History →
                     </button>
                   </div>
+                  {evidenceList.map(ev => (
+                    <div key={ev.evidence_id} className="flex items-center justify-between rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] px-3.5 py-2.5 text-sm hover:bg-white transition">
+                      <span className="flex min-w-0 items-center gap-2 text-[#1F2937]">
+                        <FileText size={16} className="shrink-0 text-[#C8102E]" />
+                        <span className="truncate font-semibold text-xs sm:text-sm">{ev.original_filename}</span>
+                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-[#1F2937]">
+                          {ev.file_type}
+                        </span>
+                        <span className="text-xs text-[#6B7280]">{(ev.file_size / 1024).toFixed(0)} KB</span>
+                        <span className="hidden font-mono text-[10px] text-[#6B7280] md:inline" title={ev.sha256_hash}>
+                          Fingerprint: {ev.sha256_hash.substring(0, 12)}...
+                        </span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={e => { e.stopPropagation(); setSelectedFilePreview(ev) }}
+                          className="rounded px-2.5 py-1 text-xs font-semibold text-[#C8102E] hover:bg-[#FFF1F2] transition"
+                        >
+                          View Content
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDeleteEvidence(ev.evidence_id) }}
+                          className="p-1 text-[#6B7280] hover:text-red-600 transition"
+                          title="Remove evidence file"
+                          aria-label="Remove evidence file"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Action Bar */}
-          <div className="mt-5 flex flex-col items-stretch justify-between gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
-            <p className="text-xs text-slate-500">
-              Evidence is hashed with SHA-256 and immutably preserved in the case vault.
-            </p>
-            <button
-              disabled={stage === 'processing' || stage === 'uploading' || evidenceList.length === 0}
-              onClick={runAnalysis}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-teal-400"
-            >
-              {stage === 'processing' ? (
-                <>
-                  <Activity className="animate-spin" size={17} /> Running Forensic Pipeline...
-                </>
-              ) : stage === 'uploading' ? (
-                <>
-                  <Activity className="animate-spin" size={17} /> Ingesting & Hashing Evidence...
-                </>
-              ) : (
-                <>
-                  <ScanText size={17} /> Analyze Evidence
-                </>
               )}
-            </button>
-          </div>
-        </section>
 
-        {/* Processing State Animation */}
-        {stage === 'processing' && (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-teal-100 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="grid size-11 place-items-center rounded-full bg-teal-100 text-teal-700">
-                <Bot className="animate-pulse" />
-              </div>
-              <div className="flex-1">
-                <div className="mb-2 flex justify-between text-sm">
-                  <span className="font-semibold text-ink">Processing investigation evidence</span>
-                  <span className="text-teal-700 font-medium">Extracting Text, Running spaCy NER & Groq AI</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full w-2/3 animate-pulse rounded-full bg-teal-500" />
-                </div>
-                <p className="mt-3 text-xs text-slate-500">
-                  Executing multi-format text extraction, OCR, forensic entity recognition, suspicious keyword taxonomy, and timeline correlation.
+              {/* Action Bar */}
+              <div className="mt-5 flex flex-col items-stretch justify-between gap-3 border-t border-[#E5E7EB] pt-5 sm:flex-row sm:items-center">
+                <p className="text-xs text-[#6B7280]">
+                  Files are assigned a cryptographic digital fingerprint (SHA-256) upon upload and protected in the evidence vault.
                 </p>
+                <button
+                  disabled={stage === 'processing' || stage === 'uploading' || evidenceList.length === 0}
+                  onClick={runAnalysis}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl btn-royal px-5 py-2.5 text-sm font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {stage === 'processing' ? (
+                    <>
+                      <Activity className="animate-spin" size={17} /> Examining Evidence...
+                    </>
+                  ) : stage === 'uploading' ? (
+                    <>
+                      <Activity className="animate-spin" size={17} /> Uploading & Calculating Fingerprints...
+                    </>
+                  ) : (
+                    <>
+                      <ScanText size={17} /> Investigate Evidence
+                    </>
+                  )}
+                </button>
               </div>
-            </div>
-          </section>
-        )}
+            </section>
 
-        {/* Live Results Dashboard */}
-        {stage !== 'processing' && dashboardData && (
-          <ResultsSection
-            dashboard={dashboardData}
-            currentCase={currentCase}
-            onOpenCaseFiles={() => setShowCaseFilesModal(true)}
-            onOpenTimeline={() => setShowTimelineModal(true)}
-            onOpenAiModal={() => setShowAiModal(true)}
-            onExportPdf={handleDownloadPdf}
-            isDownloadingPdf={isDownloadingPdf}
-          />
+            {/* Processing State Banner */}
+            {stage === 'processing' && (
+              <section className="mb-8 overflow-hidden rounded-2xl border border-[#FECDD3] bg-white p-6 shadow-xs animate-fadeIn">
+                <div className="flex items-center gap-4">
+                  <div className="grid size-12 place-items-center rounded-full bg-[#FFF1F2] text-[#C8102E] border border-[#FECDD3]">
+                    <Bot className="animate-pulse" size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="mb-2 flex justify-between text-sm">
+                      <span className="font-bold text-[#1F2937]">Investigating evidence files</span>
+                      <span className="text-[#C8102E] font-semibold text-xs">Reading text, identifying entities & synthesizing findings</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full w-2/3 animate-pulse rounded-full bg-[#C8102E]" />
+                    </div>
+                    <p className="mt-2.5 text-xs text-[#6B7280]">
+                      Extracting text from documents and images, identifying people and organisations, scanning for potential warning signs, and correlating chronological events.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Live Results Dashboard */}
+            {stage !== 'processing' && dashboardData && (
+              <ResultsSection
+                dashboard={dashboardData}
+                currentCase={currentCase}
+                onOpenCaseFiles={() => setShowCaseFilesModal(true)}
+                onOpenTimeline={() => setShowTimelineModal(true)}
+                onOpenAiModal={() => setShowAiModal(true)}
+                onExportPdf={handleDownloadPdf}
+                isDownloadingPdf={isDownloadingPdf}
+              />
+            )}
+          </>
         )}
-        </>
-      )}
       </main>
 
-      {/* Case Files Modal */}
+      {/* Case Files / Evidence Handling History Modal */}
       {showCaseFilesModal && (
         <CaseFilesModal
           evidenceList={evidenceList}
@@ -576,7 +662,7 @@ export default function App() {
         />
       )}
 
-      {/* Fullscreen AI Insights Modal */}
+      {/* AI Investigation Summary Modal */}
       {showAiModal && dashboardData && (
         <AiInsightsModal
           dashboard={dashboardData}
@@ -587,7 +673,7 @@ export default function App() {
         />
       )}
 
-      {/* New Case Modal */}
+      {/* Start New Investigation Modal */}
       {showNewCaseModal && (
         <NewCaseModal
           onCreate={handleCreateCase}
@@ -603,48 +689,48 @@ export default function App() {
         />
       )}
 
-      {/* Admin Case Reassign Modal */}
+      {/* Admin Transfer Investigation Modal */}
       {showReassignModal && currentCase && currentUser?.role === 'admin' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100">
-            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-ink">Reassign Case Ownership</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#E5E7EB]">
+            <div className="mb-4 flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+              <h3 className="text-base font-bold text-[#1F2937]">Transfer Investigation</h3>
               <button
                 onClick={() => setShowReassignModal(false)}
-                className="rounded-lg p-1 text-slate-400 hover:text-slate-700"
+                className="rounded-lg p-1 text-[#6B7280] hover:text-[#1F2937]"
               >
                 <X size={18} />
               </button>
             </div>
-            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-              Reassign case <strong className="text-slate-800 font-mono">{currentCase.case_id}</strong> to another registered investigator or admin by their User ID.
+            <p className="text-xs text-[#6B7280] mb-4 leading-relaxed">
+              Transfer investigation <strong className="text-[#1F2937] font-mono">{currentCase.case_id}</strong> to another registered investigator or administrator by their User ID.
             </p>
             <form onSubmit={e => { e.preventDefault(); handleReassignCase(reassignUserId) }} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Target User ID</label>
+                <label className="block text-xs font-semibold text-[#1F2937] mb-1">Target User ID</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. investigator_alice"
+                  placeholder="e.g. inv_kumar or admin"
                   value={reassignUserId}
                   onChange={e => setReassignUserId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:border-teal-500 focus:outline-none"
+                  className="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-xs focus:border-[#C8102E] focus:outline-none"
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#E5E7EB]">
                 <button
                   type="button"
                   onClick={() => setShowReassignModal(false)}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-semibold text-[#6B7280] hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!reassignUserId.trim()}
-                  className="rounded-lg bg-teal-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                  className="rounded-lg btn-royal px-4 py-1.5 text-xs font-semibold shadow-xs disabled:opacity-50"
                 >
-                  Confirm Reassignment
+                  Confirm Transfer
                 </button>
               </div>
             </form>
@@ -706,30 +792,30 @@ function ObservationCard({ text, compact = false }: { text: string; compact?: bo
   const obs = parseObservation(text)
 
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-2xs hover:border-teal-400/80 transition flex flex-col justify-between ${compact ? 'p-3' : 'p-4'}`}>
+    <div className={`rounded-xl border border-[#E5E7EB] bg-white shadow-2xs hover:border-[#FECDD3] transition flex flex-col justify-between ${compact ? 'p-3' : 'p-4'}`}>
       <div>
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2 mb-2">
-          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 truncate">
-            <Search size={14} className="text-teal-600 shrink-0" />
+        <div className="flex items-center justify-between gap-2 border-b border-[#E5E7EB] pb-2 mb-2">
+          <div className="flex items-center gap-1.5 font-bold text-xs text-[#1F2937] truncate">
+            <Search size={14} className="text-[#C8102E] shrink-0" />
             <span className="truncate" title={obs.filename || obs.title}>
               {obs.filename || obs.title}
             </span>
           </div>
           {obs.size && (
-            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
+            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-[#6B7280]">
               {obs.size}
             </span>
           )}
         </div>
-        <p className={`text-xs leading-relaxed text-slate-600 break-words ${compact ? 'line-clamp-3' : ''}`}>
+        <p className={`text-xs leading-relaxed text-[#1F2937] break-words ${compact ? 'line-clamp-3' : ''}`}>
           {obs.description}
         </p>
       </div>
 
       {obs.hash && (
-        <div className="mt-2.5 pt-2 border-t border-slate-100 text-[10px] font-mono text-slate-500">
-          <span className="font-semibold text-slate-400 block mb-0.5">SHA-256:</span>
-          <span className="break-all font-mono select-all bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 block" title={obs.hash}>
+        <div className="mt-2.5 pt-2 border-t border-[#E5E7EB] text-[10px] font-mono text-[#6B7280]">
+          <span className="font-semibold text-[#6B7280] block mb-0.5">Digital Fingerprint:</span>
+          <span className="break-all font-mono select-all bg-[#F8FAFC] px-1.5 py-0.5 rounded border border-[#E5E7EB] block text-[#1F2937]" title={obs.hash}>
             {compact ? `${obs.hash.substring(0, 10)}...${obs.hash.substring(obs.hash.length - 8)}` : obs.hash}
           </span>
         </div>
@@ -758,14 +844,14 @@ function ResultsSection({
   const hasAnalyzedData = dashboard.stats.documents > 0
 
   return (
-    <section>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-teal-700">
-            {hasAnalyzedData ? 'Analysis complete' : 'Case workspace initialized'}
+          <p className="text-xs font-bold uppercase tracking-wider text-[#C8102E]">
+            {hasAnalyzedData ? 'Investigation Analysis Complete' : 'Investigation Initialized'}
           </p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-ink">
-            Evidence analysis dashboard
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-[#1F2937]">
+            Investigation Analysis & Findings
           </h2>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -773,100 +859,113 @@ function ResultsSection({
             <button
               onClick={onExportPdf}
               disabled={isDownloadingPdf}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#FECDD3] bg-[#FFF1F2] px-3.5 py-1.5 text-xs font-semibold text-[#C8102E] hover:bg-[#FFE4E6] transition disabled:opacity-50"
             >
-              <FileDown size={14} /> {isDownloadingPdf ? 'Exporting PDF...' : 'Export PDF Report'}
+              <FileDown size={14} /> {isDownloadingPdf ? 'Creating Report...' : 'Download Report'}
             </button>
           )}
           <button
             onClick={onOpenCaseFiles}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-500 hover:text-teal-700 transition"
+            className="flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E] transition shadow-2xs"
           >
-            <FolderOpen size={15} /> Case Evidence <ChevronRight size={14} />
+            <FolderOpen size={15} /> Uploaded Evidence <ChevronRight size={14} />
           </button>
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        {/* 1. Evidence Summary */}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 flex flex-col justify-between">
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* 1. Investigation Summary */}
+        <article className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-xs lg:col-span-2 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-ink">Evidence Summary</h3>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+              <div>
+                <h3 className="font-bold text-[#1F2937]">Investigation Summary</h3>
+                <p className="text-xs text-[#6B7280] mt-0.5">Overview of findings across examined evidence files</p>
+              </div>
+              <span className="rounded-full bg-[#F8FAFC] border border-[#E5E7EB] px-2.5 py-1 text-xs font-semibold text-[#6B7280]">
                 {dashboard.sources_reviewed_label}
               </span>
             </div>
-            <p className="mt-4 text-sm leading-relaxed text-slate-600 break-words">
+            <p className="mt-4 text-sm leading-relaxed text-[#1F2937] break-words">
               {dashboard.summary}
             </p>
           </div>
-          <div className="mt-5 grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 pt-4 text-center">
-            <Stat value={String(dashboard.stats.documents)} label="Documents Analyzed" />
-            <Stat value={String(dashboard.stats.key_entities)} label="Key Entities" />
-            <Stat value={String(dashboard.stats.risk_signals)} label="Risk Signals" />
+          <div className="mt-5 grid grid-cols-3 divide-x divide-[#E5E7EB] border-t border-[#E5E7EB] pt-4 text-center">
+            <Stat value={String(dashboard.stats.documents)} label="Documents Examined" />
+            <Stat value={String(dashboard.stats.key_entities)} label="People, Places & Orgs" />
+            <Stat value={String(dashboard.stats.risk_signals)} label="Potential Warning Signs" />
           </div>
         </article>
 
-        {/* 2. Suspicious Keywords */}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+        {/* 2. Potential Warning Signs */}
+        <article className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle size={18} className="text-amber-500" />
-                <h3 className="font-bold text-ink">Suspicious Keywords</h3>
+                <AlertTriangle size={18} className="text-[#D97706]" />
+                <div>
+                  <h3 className="font-bold text-[#1F2937]">Potential Warning Signs</h3>
+                </div>
               </div>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                {dashboard.keywords.length} Found
+              <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-bold text-amber-700">
+                {dashboard.keywords.length} Flagged
               </span>
             </div>
-            <div className="mt-4 space-y-2 max-h-56 overflow-y-auto pr-1">
+            <p className="text-[11px] text-[#6B7280] mt-2 mb-3">
+              Highlights patterns that may deserve closer examination. These are indicators, not proof of wrongdoing.
+            </p>
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
               {dashboard.keywords.length > 0 ? (
                 dashboard.keywords.map((kw) => (
                   <div
                     key={kw.keyword}
                     title={`${kw.category} — ${kw.count} occurrences`}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 text-xs hover:border-slate-300 transition"
+                    className="flex items-center justify-between gap-2 rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] p-2 text-xs hover:border-[#FECDD3] transition"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className={`inline-block size-2 rounded-full shrink-0 ${kw.severity === 'high' ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                      <span className="font-bold text-slate-800 truncate">{kw.keyword}</span>
-                      <span className="rounded bg-slate-200/80 px-1.5 py-0.2 text-[10px] text-slate-600 font-medium truncate hidden sm:inline-block">
+                      <span className={`inline-block size-2 rounded-full shrink-0 ${kw.severity === 'high' ? 'bg-[#C8102E]' : 'bg-amber-500'}`} />
+                      <span className="font-bold text-[#1F2937] truncate">{kw.keyword}</span>
+                      <span className="rounded bg-slate-200 px-1.5 py-0.2 text-[10px] text-[#1F2937] font-medium truncate hidden sm:inline-block">
                         {kw.category}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${kw.severity === 'high' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${kw.severity === 'high' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                         {kw.severity}
                       </span>
-                      <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-700 border border-slate-200">
+                      <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-mono font-bold text-[#1F2937] border border-[#E5E7EB]">
                         ×{kw.count}
                       </span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-400">
-                  No suspicious keywords flagged in uploaded files.
+                <div className="rounded-lg border border-dashed border-[#E5E7EB] bg-[#F8FAFC] p-6 text-center text-xs text-[#6B7280]">
+                  No suspicious patterns flagged in uploaded evidence.
                 </div>
               )}
             </div>
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-400 border-t border-slate-100 pt-2.5">
-            Classified via 10-category forensic cybercrime risk taxonomy.
+          <p className="mt-3 text-[11px] leading-5 text-[#6B7280] border-t border-[#E5E7EB] pt-2.5">
+            Classified using standard cyber investigation risk taxonomy.
           </p>
         </article>
 
-        {/* 3. Extracted Entities */}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 flex flex-col justify-between">
+        {/* 3. People, Places & Organisations */}
+        <article className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-xs lg:col-span-2 flex flex-col justify-between">
           <div>
-            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Users size={18} className="text-teal-600" />
-                <h3 className="font-bold text-ink">Extracted Forensic Entities</h3>
+            <div className="mb-3 flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Users size={18} className="text-[#C8102E]" />
+                  <h3 className="font-bold text-[#1F2937]">People, Places & Organisations</h3>
+                </div>
+                <p className="text-xs text-[#6B7280] mt-0.5">
+                  Review names, locations and organisations identified in the uploaded material.
+                </p>
               </div>
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
-                {dashboard.stats.key_entities} Total Extracted
+              <span className="rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2.5 py-0.5 text-xs font-bold text-[#C8102E]">
+                {dashboard.stats.key_entities} Items Found
               </span>
             </div>
 
@@ -882,13 +981,13 @@ function ResultsSection({
                   if (!group.items || group.items.length === 0) return null
 
                   return (
-                    <div key={group.title} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 flex flex-col">
-                      <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-600">
+                    <div key={group.title} className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-3 flex flex-col">
+                      <div className="mb-2 flex items-center justify-between text-xs font-bold text-[#1F2937]">
                         <span className="flex items-center gap-1.5 truncate">
-                          <Icon size={14} className="text-teal-600 shrink-0" />
+                          <Icon size={14} className="text-[#C8102E] shrink-0" />
                           {group.title}
                         </span>
-                        <span className="rounded-full bg-slate-200/80 px-1.5 py-0.2 text-[10px] font-mono text-slate-700">
+                        <span className="rounded-full bg-slate-200 px-1.5 py-0.2 text-[10px] font-mono text-[#1F2937]">
                           {group.items.length}
                         </span>
                       </div>
@@ -896,7 +995,7 @@ function ResultsSection({
                         {group.items.map((item) => (
                           <span
                             key={item}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700 shadow-2xs hover:border-teal-400 transition max-w-full truncate"
+                            className="inline-flex items-center gap-1 rounded-md border border-[#E5E7EB] bg-white px-2 py-0.5 text-xs text-[#1F2937] shadow-2xs hover:border-[#FECDD3] transition max-w-full truncate"
                             title={item}
                           >
                             <span className="truncate">{item}</span>
@@ -908,56 +1007,65 @@ function ResultsSection({
                 })}
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-8 text-center text-sm text-slate-500">
+              <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#F8FAFC] p-8 text-center text-sm text-[#6B7280]">
                 <Users size={28} className="mx-auto text-slate-400 mb-2" />
-                <p className="font-semibold text-slate-600">No entities were extracted from the uploaded evidence.</p>
-                <p className="text-xs text-slate-400 mt-1">Upload raw chat logs, incident memos, or server audit records to detect entities.</p>
+                <p className="font-semibold text-[#1F2937]">No entities detected in evidence.</p>
+                <p className="text-xs text-[#6B7280] mt-1">Upload communications, logs, or reports to extract names, addresses, and dates.</p>
               </div>
             )}
           </div>
-          <p className="mt-4 text-xs text-slate-400 border-t border-slate-100 pt-3">
-            Extracted using regular expressions and natural language entity recognition.
+          <p className="mt-4 text-[11px] text-[#6B7280] border-t border-[#E5E7EB] pt-3">
+            Extracted using pattern matching and natural language entity recognition.
           </p>
         </article>
 
-        {/* 4. AI Generated Insights (Groq) */}
-        <article className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-navy to-slate-900 p-5 text-white shadow-md flex flex-col justify-between relative overflow-hidden">
+        {/* 4. AI Investigation Summary (Clean Pure White + Royal Red Card) */}
+        <article className="rounded-2xl border border-[#FECDD3] bg-white p-5 shadow-xs flex flex-col justify-between relative overflow-hidden">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-3">
               <div className="flex items-center gap-2">
-                <Sparkles size={18} className="text-teal-400" />
-                <h3 className="font-bold text-white text-base">AI Generated Insights</h3>
+                <div className="size-7 rounded-lg bg-[#FFF1F2] border border-[#FECDD3] flex items-center justify-center text-[#C8102E]">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-[#1F2937] text-sm">AI Investigation Summary</h3>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-teal-500/20 border border-teal-500/40 px-2 py-0.5 text-[10px] font-semibold text-teal-300">
-                  Grounded Synthesis
+              <div className="flex items-center gap-1.5">
+                <span className="rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2 py-0.5 text-[10px] font-bold text-[#C8102E]">
+                  AI Assessment
                 </span>
                 <button
                   onClick={onOpenAiModal}
-                  title="Expand Fullscreen AI Investigation Dossier"
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+                  title="Expand Full AI Investigation Summary"
+                  className="rounded-lg p-1.5 text-[#6B7280] hover:bg-slate-100 hover:text-[#1F2937] transition"
+                  aria-label="Expand AI summary"
                 >
-                  <Maximize2 size={16} />
+                  <Maximize2 size={15} />
                 </button>
               </div>
             </div>
 
+            <p className="text-[11px] text-[#6B7280] mt-2 mb-3">
+              An AI-generated overview of available evidence and possible connections. Review supporting evidence before drawing conclusions.
+            </p>
+
             {/* Executive Synthesis */}
-            <div className="mt-4 rounded-xl bg-slate-800/60 p-3.5 border border-slate-700/60">
-              <p className="text-xs font-bold uppercase tracking-wider text-teal-300 mb-1.5 flex items-center gap-1.5">
-                <FileText size={13} /> Executive Synthesis
+            <div className="rounded-xl bg-[#F8FAFC] p-3.5 border border-[#E5E7EB]">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#C8102E] mb-1.5 flex items-center gap-1.5">
+                <FileText size={13} /> Executive Overview
               </p>
-              <p className="text-xs leading-relaxed text-slate-200 break-words">
+              <p className="text-xs leading-relaxed text-[#1F2937] break-words">
                 {dashboard.ai_insights.summary}
               </p>
             </div>
 
             {/* Key Evidence Observations */}
             {dashboard.ai_insights.findings && dashboard.ai_insights.findings.length > 0 && (
-              <div className="mt-4 space-y-2">
+              <div className="mt-3.5 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wider text-teal-300">Key Evidence Observations</p>
-                  <span className="text-[10px] text-slate-400 font-medium">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#1F2937]">Key Evidence Observations</p>
+                  <span className="text-[10px] text-[#6B7280] font-medium">
                     Showing {Math.min(2, dashboard.ai_insights.findings.length)} of {dashboard.ai_insights.findings.length}
                   </span>
                 </div>
@@ -969,66 +1077,71 @@ function ResultsSection({
               </div>
             )}
 
-            {/* Recommended Investigative Follow-up preview */}
+            {/* Recommended Priority Lead */}
             {dashboard.ai_insights.leads && dashboard.ai_insights.leads.length > 0 && (
-              <div className="mt-4 rounded-xl bg-teal-950/40 border border-teal-800/40 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-teal-300 mb-1 flex items-center gap-1.5">
-                  <CheckCircle2 size={13} className="text-teal-400" /> Recommended Priority Lead
+              <div className="mt-3.5 rounded-xl bg-[#FFF1F2] border border-[#FECDD3] p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#C8102E] mb-1 flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-[#C8102E]" /> Recommended Next Step
                 </p>
-                <p className="text-xs text-teal-100 leading-snug break-words">
+                <p className="text-xs text-[#1F2937] leading-snug break-words">
                   {dashboard.ai_insights.leads[0]}
                 </p>
               </div>
             )}
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 pt-3 border-t border-slate-800">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="flex items-center gap-1.5 text-[11px] text-slate-300 truncate max-w-[200px]" title={dashboard.ai_insights.confidence_note}>
-                <Check size={14} className="text-teal-400 shrink-0" />
-                <span className="truncate">{dashboard.ai_insights.confidence_note || 'Evidence grounded analysis'}</span>
+          <div className="mt-4 flex flex-col gap-2 pt-3 border-t border-[#E5E7EB]">
+            <div className="flex items-center justify-between text-xs text-[#6B7280]">
+              <span className="flex items-center gap-1.5 text-[11px] text-[#6B7280] truncate max-w-[200px]" title={dashboard.ai_insights.confidence_note}>
+                <Check size={14} className="text-[#C8102E] shrink-0" />
+                <span className="truncate">{dashboard.ai_insights.confidence_note || 'Evidence grounded assessment'}</span>
               </span>
               <button
                 onClick={onOpenAiModal}
-                className="text-xs font-semibold text-teal-300 hover:text-teal-200 transition inline-flex items-center gap-1 shrink-0"
+                className="text-xs font-semibold text-[#C8102E] hover:underline transition inline-flex items-center gap-1 shrink-0"
               >
-                Expand View <ArrowRight size={13} />
+                Expand Details <ArrowRight size={13} />
               </button>
             </div>
           </div>
         </article>
 
-        {/* 5. Cross-Evidence Correlation */}
+        {/* 5. Possible Connections (Cross-Evidence Correlation) */}
         {dashboard.correlations && dashboard.correlations.length > 0 && (
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-3">
-            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Network size={18} className="text-teal-600" />
-                <h3 className="font-bold text-ink">Cross-Evidence Correlation</h3>
+          <article className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-xs lg:col-span-3">
+            <div className="mb-4 flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Network size={18} className="text-[#C8102E]" />
+                  <h3 className="font-bold text-[#1F2937]">Possible Connections</h3>
+                </div>
+                <p className="text-xs text-[#6B7280] mt-0.5">
+                  Explore possible relationships between people, events, files and other findings.
+                </p>
               </div>
-              <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700">
-                {dashboard.correlations.length} Multi-Source Linkages
+              <span className="rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2.5 py-0.5 text-xs font-bold text-[#C8102E]">
+                {dashboard.correlations.length} Shared Linkages
               </span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {dashboard.correlations.map((corr, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 flex flex-col justify-between">
+                <div key={idx} className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-3.5 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold uppercase tracking-wider text-slate-600 text-[10px]">
+                      <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold uppercase tracking-wider text-[#1F2937] text-[10px]">
                         {corr.entity_type}
                       </span>
-                      <span className="font-semibold text-teal-700 text-xs">{corr.occurrences} file(s)</span>
+                      <span className="font-semibold text-[#C8102E] text-xs">{corr.occurrences} file(s)</span>
                     </div>
-                    <h4 className="mt-1 text-sm font-bold text-slate-800 break-words" title={corr.entity_value}>
+                    <h4 className="mt-1 text-sm font-bold text-[#1F2937] break-words" title={corr.entity_value}>
                       {corr.entity_value}
                     </h4>
                   </div>
-                  <div className="mt-3 pt-2 border-t border-slate-200/60">
-                    <p className="text-[11px] text-slate-400 font-medium mb-1">Found in sources:</p>
+                  <div className="mt-3 pt-2 border-t border-[#E5E7EB]">
+                    <p className="text-[11px] text-[#6B7280] font-medium mb-1">Found in sources:</p>
                     <div className="flex flex-wrap gap-1">
                       {corr.evidence_names.map((name, i) => (
-                        <span key={i} className="rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600 font-medium truncate max-w-full">
+                        <span key={i} className="rounded bg-white border border-[#E5E7EB] px-1.5 py-0.5 text-[10px] text-[#1F2937] font-medium truncate max-w-full">
                           {name}
                         </span>
                       ))}
@@ -1040,63 +1153,68 @@ function ResultsSection({
           </article>
         )}
 
-        {/* 6. Timeline of Events */}
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-3">
-          <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Clock3 size={18} className="text-teal-600" />
-              <h3 className="font-bold text-ink">Timeline of Events</h3>
+        {/* 6. Event Timeline */}
+        <article className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-xs lg:col-span-3">
+          <div className="mb-4 flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Clock3 size={18} className="text-[#C8102E]" />
+                <h3 className="font-bold text-[#1F2937]">Event Timeline</h3>
+              </div>
+              <p className="text-xs text-[#6B7280] mt-0.5">
+                View events arranged in chronological order based on the available evidence.
+              </p>
             </div>
             {dashboard.timeline.length > 3 && (
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-xs font-semibold text-[#6B7280]">
                 Showing 3 of {dashboard.timeline.length} chronological events
               </span>
             )}
           </div>
 
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3">
             {dashboard.timeline.length > 0 ? (
               dashboard.timeline.slice(0, 3).map((event, i) => (
                 <div
                   key={`${event.time}-${i}`}
-                  className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 flex flex-col justify-between"
+                  className="rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-4 flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 mb-2">
-                      <span className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
-                        <span className={`size-2.5 rounded-full ${event.color}`} />
+                    <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-2 mb-2">
+                      <span className="text-xs font-bold text-[#1F2937] uppercase tracking-wide flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-[#C8102E]" />
                         {event.time}
                       </span>
-                      <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">
+                      <span className="rounded bg-[#FFF1F2] border border-[#FECDD3] px-1.5 py-0.5 text-[10px] font-bold text-[#C8102E]">
                         {event.title}
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm leading-relaxed text-slate-700 break-words mt-2">
+                    <p className="text-xs sm:text-sm leading-relaxed text-[#1F2937] break-words mt-2">
                       {event.detail}
                     </p>
                   </div>
-                  <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="mt-3 pt-2 border-t border-[#E5E7EB] flex items-center justify-between text-[11px] text-[#6B7280]">
                     <span className="truncate max-w-[200px]" title={event.source_evidence}>
                       Source: {event.source_evidence}
                     </span>
-                    {event.has_location && <MapPin size={13} className="shrink-0 text-rose-500" />}
+                    {event.has_location && <MapPin size={13} className="shrink-0 text-[#C8102E]" />}
                   </div>
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-400 md:col-span-3">
+              <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#F8FAFC] p-8 text-center text-sm text-[#6B7280] md:col-span-3">
                 No chronological timestamp markers detected in evidence.
               </div>
             )}
           </div>
 
           {dashboard.timeline.length > 0 && (
-            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+            <div className="mt-4 pt-3 border-t border-[#E5E7EB] flex justify-end">
               <button
                 onClick={onOpenTimeline}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 transition"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C8102E] hover:underline transition"
               >
-                Open complete timeline view ({dashboard.timeline.length} events) <ArrowRight size={14} />
+                Open complete timeline ({dashboard.timeline.length} events) <ArrowRight size={14} />
               </button>
             </div>
           )}
@@ -1108,9 +1226,9 @@ function ResultsSection({
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div>
-      <p className="text-lg font-bold text-ink">{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+    <div className="px-2">
+      <p className="text-xl font-bold text-[#1F2937]">{value}</p>
+      <p className="text-xs text-[#6B7280] mt-0.5">{label}</p>
     </div>
   )
 }
@@ -1136,18 +1254,20 @@ function CaseFilesModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
+      <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl border border-[#E5E7EB] flex flex-col max-h-[90vh]">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#E5E7EB] pb-3 gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold text-ink">Case Evidence Repository & Chain of Custody</h3>
+              <h3 className="text-base font-bold text-[#1F2937]">Uploaded Evidence & Evidence Handling History</h3>
               {currentCase && (
-                <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-700">
+                <span className="rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2 py-0.5 font-mono text-[11px] font-bold text-[#C8102E]">
                   Owner: @{currentCase.owner_user_id || 'unassigned'}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500">Verified digital evidence files and cryptographic integrity hashes</p>
+            <p className="text-xs text-[#6B7280]">
+              Verified digital evidence files and digital file fingerprints (SHA-256)
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {currentUser?.role === 'admin' && currentCase && (
@@ -1155,59 +1275,67 @@ function CaseFilesModal({
                 {onOpenReassign && (
                   <button
                     onClick={onOpenReassign}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                    className="rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] px-2.5 py-1 text-xs font-semibold text-[#1F2937] hover:bg-slate-100"
                   >
-                    Reassign Owner
+                    Transfer Investigation
                   </button>
                 )}
                 {onDeleteCase && (
                   <button
                     onClick={() => { onClose(); onDeleteCase(currentCase.case_id); }}
-                    className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                    className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
                   >
-                    Delete Case
+                    Delete Investigation
                   </button>
                 )}
               </>
             )}
-            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-              <X size={20} />
+            <button
+              onClick={onClose}
+              aria-label="Close dialog"
+              className="rounded-lg p-1.5 text-[#6B7280] hover:bg-slate-100 hover:text-[#1F2937]"
+            >
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="flex-1 overflow-y-auto rounded-xl border border-[#E5E7EB]">
           <table className="w-full text-left text-xs">
-            <thead className="sticky top-0 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold">
+            <thead className="sticky top-0 bg-[#F8FAFC] border-b border-[#E5E7EB] text-[#6B7280] uppercase tracking-wider font-semibold">
               <tr>
-                <th className="px-3 py-2.5">Evidence ID</th>
-                <th className="px-3 py-2.5">Original Filename</th>
-                <th className="px-3 py-2.5">Format</th>
-                <th className="px-3 py-2.5">Size</th>
-                <th className="px-3 py-2.5">SHA-256 Hash</th>
-                <th className="px-3 py-2.5">Status</th>
-                <th className="px-3 py-2.5 text-right">Action</th>
+                <th className="px-3.5 py-2.5">Evidence ID</th>
+                <th className="px-3.5 py-2.5">File Name</th>
+                <th className="px-3.5 py-2.5">File Format</th>
+                <th className="px-3.5 py-2.5">Size</th>
+                <th className="px-3.5 py-2.5">Digital Fingerprint</th>
+                <th className="px-3.5 py-2.5">Status</th>
+                <th className="px-3.5 py-2.5 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#E5E7EB] bg-white">
               {evidenceList.map(ev => (
-                <tr key={ev.evidence_id} className="hover:bg-slate-50/80">
-                  <td className="px-3 py-2.5 font-mono text-slate-600">{ev.evidence_id}</td>
-                  <td className="px-3 py-2.5 font-medium text-slate-800">{ev.original_filename}</td>
-                  <td className="px-3 py-2.5"><span className="rounded bg-slate-100 px-1.5 py-0.5 font-bold text-slate-600">{ev.file_type}</span></td>
-                  <td className="px-3 py-2.5 text-slate-500">{(ev.file_size / 1024).toFixed(1)} KB</td>
-                  <td className="px-3 py-2.5 font-mono text-[11px] text-slate-500" title={ev.sha256_hash}>
+                <tr key={ev.evidence_id} className="hover:bg-slate-50/80 transition">
+                  <td className="px-3.5 py-2.5 font-mono text-[#6B7280]">{ev.evidence_id}</td>
+                  <td className="px-3.5 py-2.5 font-semibold text-[#1F2937]">{ev.original_filename}</td>
+                  <td className="px-3.5 py-2.5">
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-bold text-[#1F2937]">
+                      {ev.file_type}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-2.5 text-[#6B7280]">{(ev.file_size / 1024).toFixed(1)} KB</td>
+                  <td className="px-3.5 py-2.5 font-mono text-[11px] text-[#6B7280]" title={ev.sha256_hash}>
                     {ev.sha256_hash.substring(0, 16)}...
                   </td>
-                  <td className="px-3 py-2.5">
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                  <td className="px-3.5 py-2.5">
+                    <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                       {ev.status}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3.5 py-2.5 text-right">
                     <button
                       onClick={() => onSelectPreview(ev)}
-                      className="text-xs font-semibold text-teal-600 hover:text-teal-800"
+                      className="text-xs font-semibold text-[#C8102E] hover:underline"
                     >
                       View Text
                     </button>
@@ -1216,6 +1344,16 @@ function CaseFilesModal({
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-[#E5E7EB] flex items-center justify-between text-xs text-[#6B7280]">
+          <span>Files checked for integrity with SHA-256 fingerprint verification</span>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-[#E5E7EB] px-4 py-1.5 text-xs font-semibold text-[#1F2937] hover:bg-slate-100"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -1239,48 +1377,63 @@ function FullTimelineModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl border border-[#E5E7EB] flex flex-col max-h-[90vh]">
+        <div className="mb-4 flex items-center justify-between border-b border-[#E5E7EB] pb-3">
           <div>
-            <h3 className="text-lg font-bold text-ink">Chronological Investigation Timeline</h3>
-            <p className="text-xs text-slate-500">Complete normalized temporal sequence of events across evidence</p>
+            <h3 className="text-base font-bold text-[#1F2937]">Event Timeline</h3>
+            <p className="text-xs text-[#6B7280]">
+              Chronological sequence of events arranged from examined evidence
+            </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-            <X size={20} />
+          <button
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="rounded-lg p-1.5 text-[#6B7280] hover:bg-slate-100 hover:text-[#1F2937]"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <div className="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-          <Search size={16} className="text-slate-400" />
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2 text-sm">
+          <Search size={16} className="text-[#6B7280]" />
           <input
             type="text"
-            placeholder="Filter timeline by keyword, suspect, or source file..."
+            placeholder="Search timeline by keyword, name, or source file..."
             value={filterQuery}
             onChange={e => setFilterQuery(e.target.value)}
-            className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+            className="w-full bg-transparent text-xs text-[#1F2937] placeholder-[#6B7280] focus:outline-none"
           />
         </div>
 
-        <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-2">
+        <div className="flex-1 space-y-3 overflow-y-auto pr-1">
           {filtered.length > 0 ? (
             filtered.map((evt, idx) => (
-              <div key={idx} className="flex gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-                <span className={`size-3 shrink-0 rounded-full mt-1.5 ${evt.color}`} />
+              <div key={idx} className="flex gap-3.5 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
+                <span className="size-2.5 shrink-0 rounded-full bg-[#C8102E] mt-1.5" />
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{evt.time}</span>
-                    <span className="text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">
+                    <span className="text-xs font-bold text-[#C8102E] uppercase tracking-wide">{evt.time}</span>
+                    <span className="text-xs font-semibold text-[#1F2937] bg-white border border-[#E5E7EB] px-2 py-0.5 rounded">
                       {evt.source_evidence}
                     </span>
                   </div>
-                  <h4 className="mt-1 font-bold text-slate-800 text-sm">{evt.title}</h4>
-                  <p className="mt-1 text-sm text-slate-600 leading-relaxed">{evt.detail}</p>
+                  <h4 className="mt-1 font-bold text-[#1F2937] text-sm">{evt.title}</h4>
+                  <p className="mt-1 text-xs sm:text-sm text-[#1F2937] leading-relaxed">{evt.detail}</p>
                 </div>
               </div>
             ))
           ) : (
-            <p className="py-8 text-center text-sm text-slate-400">No events matched your filter.</p>
+            <p className="py-8 text-center text-sm text-[#6B7280]">No events matched your search.</p>
           )}
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-[#E5E7EB] flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-[#E5E7EB] px-4 py-1.5 text-xs font-semibold text-[#1F2937] hover:bg-slate-100"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -1306,62 +1459,69 @@ function NewCaseModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-bold text-ink">Create New Investigation Case</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#E5E7EB]">
+        <div className="mb-4 flex items-center justify-between border-b border-[#E5E7EB] pb-3">
+          <div>
+            <h3 className="text-base font-bold text-[#1F2937]">Start New Investigation</h3>
+            <p className="text-xs text-[#6B7280]">Create a dossier to organize evidence and analysis</p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="rounded-lg p-1 text-[#6B7280] hover:bg-slate-100"
+          >
             <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="font-semibold text-slate-700">Case Title *</label>
+            <label className="font-semibold text-[#1F2937]">Investigation Title *</label>
             <input
               type="text"
               required
-              placeholder="e.g. Unauthorized Vendor Data Access Investigation"
+              placeholder="e.g. Unauthorized Cloud Account Access Investigation"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-xs text-[#1F2937] focus:border-[#C8102E] focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700">Lead Investigator</label>
+            <label className="font-semibold text-[#1F2937]">Lead Investigator</label>
             <input
               type="text"
-              placeholder="e.g. Detective R. Kumar / Forensics Unit"
+              placeholder="e.g. Investigator R. Kumar"
               value={investigator}
               onChange={e => setInvestigator(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-xs text-[#1F2937] focus:border-[#C8102E] focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="font-semibold text-slate-700">Case Description</label>
+            <label className="font-semibold text-[#1F2937]">Investigation Description</label>
             <textarea
               rows={3}
-              placeholder="Brief context regarding the incident and evidence origin..."
+              placeholder="Brief context regarding incident, incident date, and evidence scope..."
               value={description}
               onChange={e => setDescription(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none"
+              className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-xs text-[#1F2937] focus:border-[#C8102E] focus:outline-none"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-[#E5E7EB]">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-3 py-2 font-semibold text-slate-600 hover:bg-slate-100"
+              className="rounded-lg px-3 py-1.5 font-semibold text-[#6B7280] hover:bg-slate-100"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-teal-600 px-4 py-2 font-semibold text-white hover:bg-teal-700"
+              className="rounded-lg btn-royal px-4 py-1.5 font-semibold text-xs shadow-xs"
             >
-              Create Case
+              Start Investigation
             </button>
           </div>
         </form>
@@ -1379,25 +1539,38 @@ function FilePreviewModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl border border-[#E5E7EB] flex flex-col max-h-[90vh]">
+        <div className="mb-4 flex items-center justify-between border-b border-[#E5E7EB] pb-3">
           <div>
-            <h3 className="text-base font-bold text-ink">{evidence.original_filename}</h3>
-            <p className="font-mono text-xs text-slate-400">SHA-256: {evidence.sha256_hash}</p>
+            <h3 className="text-base font-bold text-[#1F2937]">{evidence.original_filename}</h3>
+            <p className="font-mono text-xs text-[#6B7280]">Digital Fingerprint: {evidence.sha256_hash}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
+          <button
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="rounded-lg p-1 text-[#6B7280] hover:bg-slate-100"
+          >
             <X size={18} />
           </button>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto rounded-lg bg-slate-50 p-4 font-mono text-xs text-slate-800 whitespace-pre-wrap">
+        <div className="flex-1 overflow-y-auto rounded-lg bg-[#F8FAFC] border border-[#E5E7EB] p-4 font-mono text-xs text-[#1F2937] whitespace-pre-wrap">
           {evidence.extracted_text_preview ? (
             evidence.extracted_text_preview
           ) : (
-            <span className="text-slate-400 italic">
-              Extracted text will appear here after clicking "Analyze Evidence".
+            <span className="text-[#6B7280] italic">
+              Extracted text will appear here after clicking "Investigate Evidence".
             </span>
           )}
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-[#E5E7EB] flex justify-end">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-[#E5E7EB] px-4 py-1.5 text-xs font-semibold text-[#1F2937] hover:bg-slate-100"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -1418,25 +1591,25 @@ function AiInsightsModal({
   isDownloadingPdf?: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 sm:p-6 backdrop-blur-sm">
-      <div className="flex h-full max-h-[90vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-6 backdrop-blur-sm">
+      <div className="flex h-full max-h-[90vh] w-full max-w-5xl flex-col rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl overflow-hidden">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-6 py-4 text-white">
+        <div className="flex items-center justify-between border-b border-[#E5E7EB] bg-white px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="grid size-9 place-items-center rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30">
+            <div className="grid size-9 place-items-center rounded-lg bg-[#FFF1F2] text-[#C8102E] border border-[#FECDD3]">
               <Sparkles size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold tracking-tight text-white">
-                  AI Generated Investigation Insights
+                <h3 className="text-base font-bold tracking-tight text-[#1F2937]">
+                  AI Investigation Summary & Findings
                 </h3>
-                <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[11px] font-mono text-teal-300">
-                  Case ID: {currentCase?.case_id || dashboard.case_id}
+                <span className="rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2.5 py-0.5 text-[11px] font-mono text-[#C8102E]">
+                  Investigation ID: {currentCase?.case_id || dashboard.case_id}
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Grounded digital evidence synthesis & heuristic risk analysis
+              <p className="text-xs text-[#6B7280]">
+                AI-assisted overview of findings, patterns, and possible connections
               </p>
             </div>
           </div>
@@ -1446,51 +1619,59 @@ function AiInsightsModal({
               <button
                 onClick={onExportPdf}
                 disabled={isDownloadingPdf}
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-teal-300 hover:bg-slate-700 transition disabled:opacity-50"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-[#FECDD3] bg-[#FFF1F2] px-3.5 py-1.5 text-xs font-semibold text-[#C8102E] hover:bg-[#FFE4E6] transition disabled:opacity-50"
               >
-                <FileDown size={14} /> {isDownloadingPdf ? 'Exporting...' : 'Export Report PDF'}
+                <FileDown size={14} /> {isDownloadingPdf ? 'Creating Report...' : 'Download Report'}
               </button>
             )}
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-              title="Close modal"
+              aria-label="Close dialog"
+              className="rounded-lg p-1.5 text-[#6B7280] hover:bg-slate-100 hover:text-[#1F2937] transition"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
         {/* Modal Body - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
-          {/* 1. Executive Synthesis */}
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#F8FAFC]">
+          {/* Notice Banner */}
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+            <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <span>
+              <strong>AI-Generated Overview:</strong> These findings and connections are generated from uploaded evidence. Always verify supporting evidence before drawing conclusions.
+            </span>
+          </div>
+
+          {/* 1. Executive Summary */}
+          <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-xs">
+            <div className="mb-3 flex items-center justify-between border-b border-[#E5E7EB] pb-2.5">
               <div className="flex items-center gap-2">
-                <FileText size={17} className="text-teal-600" />
-                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                  Executive Synthesis
+                <FileText size={17} className="text-[#C8102E]" />
+                <h4 className="text-sm font-bold uppercase tracking-wider text-[#1F2937]">
+                  Executive Overview
                 </h4>
               </div>
-              <span className="rounded-full bg-teal-50 border border-teal-200 px-2.5 py-0.5 text-xs font-semibold text-teal-700">
-                Forensic Overview
+              <span className="rounded-full bg-[#FFF1F2] border border-[#FECDD3] px-2.5 py-0.5 text-xs font-bold text-[#C8102E]">
+                Overview
               </span>
             </div>
-            <p className="text-sm leading-relaxed text-slate-700 break-words whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed text-[#1F2937] break-words whitespace-pre-wrap">
               {dashboard.ai_insights.summary}
             </p>
           </section>
 
           {/* 2. Key Evidence Observations */}
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-xs">
+            <div className="mb-3 flex items-center justify-between border-b border-[#E5E7EB] pb-2.5">
               <div className="flex items-center gap-2">
-                <Search size={17} className="text-teal-600" />
-                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                <Search size={17} className="text-[#C8102E]" />
+                <h4 className="text-sm font-bold uppercase tracking-wider text-[#1F2937]">
                   Key Evidence Observations ({dashboard.ai_insights.findings?.length || 0})
                 </h4>
               </div>
-              <span className="text-xs text-slate-400">Cryptographically verified artifacts</span>
+              <span className="text-xs text-[#6B7280]">Verified evidence artifacts</span>
             </div>
 
             {dashboard.ai_insights.findings && dashboard.ai_insights.findings.length > 0 ? (
@@ -1500,41 +1681,41 @@ function AiInsightsModal({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 italic py-2">No individual observations recorded.</p>
+              <p className="text-xs text-[#6B7280] italic py-2">No individual observations recorded.</p>
             )}
           </section>
 
-          {/* 3. Correlated Findings */}
+          {/* 3. Possible Connections */}
           {dashboard.correlations && dashboard.correlations.length > 0 && (
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-xs">
+              <div className="mb-3 flex items-center justify-between border-b border-[#E5E7EB] pb-2.5">
                 <div className="flex items-center gap-2">
-                  <Network size={17} className="text-teal-600" />
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                    Correlated Cross-Evidence Linkages ({dashboard.correlations.length})
+                  <Network size={17} className="text-[#C8102E]" />
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#1F2937]">
+                    Possible Connections ({dashboard.correlations.length})
                   </h4>
                 </div>
-                <span className="text-xs text-teal-600 font-semibold">Multi-source matches</span>
+                <span className="text-xs text-[#C8102E] font-semibold">Shared Linkages</span>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                 {dashboard.correlations.map((corr, idx) => (
-                  <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-3 flex flex-col justify-between">
+                  <div key={idx} className="rounded-lg border border-[#E5E7EB] bg-[#F8FAFC] p-3 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="rounded bg-slate-200 px-1.5 py-0.2 font-mono text-[10px] font-bold text-slate-600 uppercase">
+                        <span className="rounded bg-slate-200 px-1.5 py-0.2 font-mono text-[10px] font-bold text-[#1F2937] uppercase">
                           {corr.entity_type}
                         </span>
-                        <span className="font-semibold text-teal-700 text-xs">
+                        <span className="font-semibold text-[#C8102E] text-xs">
                           {corr.occurrences} file(s)
                         </span>
                       </div>
-                      <p className="font-bold text-slate-800 text-xs break-words">{corr.entity_value}</p>
+                      <p className="font-bold text-[#1F2937] text-xs break-words">{corr.entity_value}</p>
                     </div>
-                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
-                      <span className="block text-[10px] uppercase font-semibold text-slate-400 mb-0.5">Sources:</span>
+                    <div className="mt-2.5 pt-2 border-t border-[#E5E7EB] text-[11px] text-[#6B7280]">
+                      <span className="block text-[10px] uppercase font-semibold text-[#6B7280] mb-0.5">Found in:</span>
                       <div className="flex flex-wrap gap-1">
                         {corr.evidence_names.map((src, i) => (
-                          <span key={i} className="rounded bg-white border border-slate-200 px-1.5 py-0.2 text-[10px] text-slate-600 truncate max-w-full">
+                          <span key={i} className="rounded bg-white border border-[#E5E7EB] px-1.5 py-0.2 text-[10px] text-[#1F2937] truncate max-w-full">
                             {src}
                           </span>
                         ))}
@@ -1546,21 +1727,21 @@ function AiInsightsModal({
             </section>
           )}
 
-          {/* 4. Risk Indicators & Behavioral Patterns */}
+          {/* 4. Potential Warning Signs & Patterns */}
           {dashboard.ai_insights.patterns && dashboard.ai_insights.patterns.length > 0 && (
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-xs">
+              <div className="mb-3 flex items-center justify-between border-b border-[#E5E7EB] pb-2.5">
                 <div className="flex items-center gap-2">
-                  <ShieldAlert size={17} className="text-amber-500" />
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                    Risk Indicators & Patterns ({dashboard.ai_insights.patterns.length})
+                  <ShieldAlert size={17} className="text-[#D97706]" />
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#1F2937]">
+                    Potential Warning Signs & Patterns ({dashboard.ai_insights.patterns.length})
                   </h4>
                 </div>
-                <span className="text-xs text-amber-600 font-semibold">Anomalies</span>
+                <span className="text-xs text-amber-700 font-semibold">Anomalies</span>
               </div>
               <div className="space-y-2">
                 {dashboard.ai_insights.patterns.map((pat, idx) => (
-                  <div key={idx} className="flex items-start gap-2.5 rounded-lg border border-amber-200/70 bg-amber-50/40 p-3 text-xs text-slate-700">
+                  <div key={idx} className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-[#1F2937]">
                     <AlertTriangle size={15} className="shrink-0 text-amber-600 mt-0.5" />
                     <span className="leading-relaxed break-words">{pat}</span>
                   </div>
@@ -1569,22 +1750,22 @@ function AiInsightsModal({
             </section>
           )}
 
-          {/* 5. Recommended Investigative Follow-ups */}
+          {/* 5. Recommended Next Steps */}
           {dashboard.ai_insights.leads && dashboard.ai_insights.leads.length > 0 && (
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-              <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-xs">
+              <div className="mb-3 flex items-center justify-between border-b border-[#E5E7EB] pb-2.5">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 size={17} className="text-teal-600" />
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                    Recommended Investigative Follow-ups ({dashboard.ai_insights.leads.length})
+                  <CheckCircle2 size={17} className="text-[#C8102E]" />
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#1F2937]">
+                    Recommended Next Steps ({dashboard.ai_insights.leads.length})
                   </h4>
                 </div>
-                <span className="text-xs text-teal-600 font-semibold">Priority Action Items</span>
+                <span className="text-xs text-[#C8102E] font-semibold">Priority Action Items</span>
               </div>
               <div className="space-y-2.5">
                 {dashboard.ai_insights.leads.map((lead, idx) => (
-                  <div key={idx} className="flex items-start gap-3 rounded-lg border border-teal-100 bg-teal-50/40 p-3 text-xs text-slate-800">
-                    <span className="grid size-5 shrink-0 place-items-center rounded-full bg-teal-600 text-white font-bold text-[10px]">
+                  <div key={idx} className="flex items-start gap-3 rounded-lg border border-[#FECDD3] bg-[#FFF1F2] p-3 text-xs text-[#1F2937]">
+                    <span className="grid size-5 shrink-0 place-items-center rounded-full btn-royal text-white font-bold text-[10px]">
                       {idx + 1}
                     </span>
                     <span className="leading-relaxed break-words">{lead}</span>
@@ -1596,23 +1777,23 @@ function AiInsightsModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-6 py-3.5">
-          <p className="text-[11px] text-slate-500 italic text-center sm:text-left">
-            AI-generated assistive analysis. Findings require human investigator verification.
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#E5E7EB] bg-white px-6 py-3.5">
+          <p className="text-[11px] text-[#6B7280] italic text-center sm:text-left">
+            AI-generated assistive overview. Findings are indicators and require verification by an investigator.
           </p>
           <div className="flex items-center gap-2">
             {currentCase && onExportPdf && (
               <button
                 onClick={onExportPdf}
                 disabled={isDownloadingPdf}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-teal-500 hover:text-teal-700 transition disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E] transition disabled:opacity-50"
               >
-                <FileDown size={14} /> {isDownloadingPdf ? 'Exporting...' : 'Export PDF'}
+                <FileDown size={14} className="text-[#C8102E]" /> {isDownloadingPdf ? 'Creating Report...' : 'Download Report'}
               </button>
             )}
             <button
               onClick={onClose}
-              className="rounded-lg bg-navy px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
+              className="rounded-lg border border-[#E5E7EB] hover:bg-slate-100 px-4 py-1.5 text-xs font-semibold text-[#1F2937] transition"
             >
               Close
             </button>
@@ -1622,4 +1803,3 @@ function AiInsightsModal({
     </div>
   )
 }
-

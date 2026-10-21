@@ -1,12 +1,70 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0b1220;
-  --color-navy: #111d36;
-  --color-accent: #14b8a6;
-  --color-mist: #f5f7fb;
+  --color-brand: #C8102E;
+  --color-brand-hover: #A50F26;
+  --color-brand-soft: #FFF1F2;
+  --color-brand-tint: #FFE4E6;
+  --color-brand-border: #FECDD3;
+  --color-surface: #FFFFFF;
+  --color-subtle: #F8FAFC;
+  --color-divider: #E5E7EB;
+  --color-text-main: #1F2937;
+  --color-text-muted: #6B7280;
 }
 
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #f5f7fb; color: #172033; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-button, input { font: inherit; }
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background-color: #F8FAFC;
+  color: #1F2937;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+/* Custom scrollbars for clean presentation */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Subtle glossy sheen for primary buttons & brand badges */
+.btn-royal {
+  background: linear-gradient(180deg, #D91B3A 0%, #C8102E 60%, #B70E28 100%);
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(200, 16, 46, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: all 0.15s ease-in-out;
+}
+.btn-royal:hover:not(:disabled) {
+  background: linear-gradient(180deg, #C8102E 0%, #B70E28 60%, #A50F26 100%);
+  box-shadow: 0 2px 6px rgba(200, 16, 46, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn-royal:active:not(:disabled) {
+  background: #A50F26;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.brand-badge {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF1F2 100%);
+  border: 1px solid #FECDD3;
+  color: #C8102E;
+}
