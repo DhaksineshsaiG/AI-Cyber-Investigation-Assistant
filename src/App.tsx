@@ -4,7 +4,7 @@ import {
   Clock3, Cpu, ExternalLink, FileDown, FileText, FolderOpen, Mail, MapPin, Maximize2, Network,
   Phone, Plus, RefreshCw, ScanText, Search, Shield, ShieldAlert, ShieldCheck, Sparkles, Tag,
   Trash2, Upload, Users, X, LogOut, User as UserIcon, HelpCircle, ChevronDown, ChevronUp,
-  FileCheck, Info
+  FileCheck, Info, Menu
 } from 'lucide-react'
 import { api } from './services/api'
 import type { CaseItem, EvidenceItem, DashboardData, User } from './types/investigation'
@@ -16,6 +16,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(api.getStoredUser())
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(Boolean(api.getStoredToken()))
   const [activeView, setActiveView] = useState<'workspace' | 'activity_monitor'>('workspace')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [currentCase, setCurrentCase] = useState<CaseItem | null>(null)
   const [allCases, setAllCases] = useState<CaseItem[]>([])
   const [evidenceList, setEvidenceList] = useState<EvidenceItem[]>([])
@@ -257,88 +258,165 @@ export default function App() {
     <div className="min-h-screen bg-[#F8FAFC] text-[#1F2937]">
       {/* Top Header */}
       <header className="border-b border-[#E5E7EB] bg-white sticky top-0 z-40 shadow-xs">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          {/* Logo & Platform Name */}
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#C8102E] to-[#A50F26] text-white shadow-sm shadow-red-500/20">
-              <ShieldCheck size={22} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveView('workspace')}
-                  className="text-left group cursor-pointer"
-                  title="Return to investigation workspace"
-                >
-                  <h1 className="text-sm font-bold tracking-tight text-[#1F2937] sm:text-base group-hover:text-[#C8102E] transition">
-                    AI Cyber Investigation Assistant
-                  </h1>
-                </button>
-                {currentUser.role === 'admin' && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveView(activeView === 'activity_monitor' ? 'workspace' : 'activity_monitor')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold transition border cursor-pointer ${
-                      activeView === 'activity_monitor'
-                        ? 'bg-[#C8102E] text-white border-[#C8102E] shadow-2xs'
-                        : 'bg-[#FFF1F2] border-[#FECDD3] text-[#C8102E] hover:bg-[#FFE4E6]'
-                    }`}
-                    title={activeView === 'activity_monitor' ? 'Return to Investigation Workspace' : 'Open Investigator Activity Monitor'}
-                  >
-                    <Activity size={13} className={activeView === 'activity_monitor' ? 'text-white' : 'text-[#C8102E]'} />
-                    <span>Activity Monitor</span>
-                  </button>
-                )}
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
+          {/* Brand Logo & Title (Left) */}
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveView('workspace')
+                setMobileMenuOpen(false)
+              }}
+              className="flex items-center gap-3 text-left group cursor-pointer"
+              title="Return to investigation workspace"
+            >
+              <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#C8102E] to-[#A50F26] text-white shadow-sm shadow-red-500/20 shrink-0">
+                <ShieldCheck size={20} className="shrink-0" />
               </div>
-              <p className="text-xs text-[#6B7280]">
-                {activeView === 'activity_monitor' && currentUser.role === 'admin'
-                  ? 'Investigator accountability and security audit monitoring'
-                  : 'Digital evidence intelligence workspace'}
-              </p>
+              <div className="flex flex-col">
+                <h1 className="text-sm font-bold tracking-tight text-[#1F2937] sm:text-base group-hover:text-[#C8102E] transition whitespace-nowrap">
+                  AI Cyber Investigation Assistant
+                </h1>
+                <p className="text-[11px] text-[#6B7280] hidden sm:block whitespace-nowrap leading-tight">
+                  Digital evidence intelligence workspace
+                </p>
+              </div>
+            </button>
+          </div>
+
+          {/* Desktop Navigation & Actions (Right) */}
+          <div className="hidden lg:flex items-center gap-2 xl:gap-2.5">
+            {/* Activity Monitor (Admin-Only Navigation) */}
+            {currentUser.role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => setActiveView(activeView === 'activity_monitor' ? 'workspace' : 'activity_monitor')}
+                className={`inline-flex items-center gap-2 h-10 px-3.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer border ${
+                  activeView === 'activity_monitor'
+                    ? 'bg-[#C8102E] text-white border-[#C8102E] shadow-2xs'
+                    : 'bg-white border-[#E5E7EB] text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E]'
+                }`}
+                title={activeView === 'activity_monitor' ? 'Return to Investigation Workspace' : 'Open Investigator Activity Monitor'}
+              >
+                <Activity size={16} className={`shrink-0 ${activeView === 'activity_monitor' ? 'text-white' : 'text-[#6B7280]'}`} />
+                <span>Activity Monitor</span>
+              </button>
+            )}
+
+            {/* Access Permissions (Admin-Only) */}
+            {currentUser.role === 'admin' && (
+              <button
+                type="button"
+                onClick={() => setShowAdminModal(true)}
+                className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E] whitespace-nowrap transition cursor-pointer"
+                title="Manage user accounts and access permissions"
+              >
+                <Users size={16} className="shrink-0 text-[#6B7280]" />
+                <span>Access Permissions</span>
+              </button>
+            )}
+
+            {/* Download Report (When case is active) */}
+            {currentCase && (
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="inline-flex items-center gap-2 h-10 px-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E] whitespace-nowrap transition disabled:opacity-50 cursor-pointer shadow-2xs"
+                title="Download formal investigation report as PDF"
+              >
+                <FileDown size={16} className="shrink-0 text-[#6B7280]" />
+                <span>{isDownloadingPdf ? 'Creating Report...' : 'Download Report'}</span>
+              </button>
+            )}
+
+            {/* Start New Investigation (Primary Action) */}
+            <button
+              type="button"
+              onClick={() => setShowNewCaseModal(true)}
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl btn-royal text-xs font-semibold whitespace-nowrap shadow-xs transition cursor-pointer"
+              title="Start a new investigation dossier"
+            >
+              <Plus size={16} className="shrink-0" />
+              <span>Start New Investigation</span>
+            </button>
+
+            {/* User Profile & Logout */}
+            <div className="flex items-center gap-2.5 pl-3 border-l border-[#E5E7EB] shrink-0">
+              <div className="text-right">
+                <div className="text-xs font-bold text-[#1F2937] leading-tight truncate max-w-[130px] xl:max-w-[160px]">
+                  {currentUser.display_name}
+                </div>
+                <div className="text-[10px] text-[#6B7280] font-mono leading-tight truncate max-w-[130px] xl:max-w-[160px]">
+                  @{currentUser.user_id}
+                </div>
+              </div>
+              <span
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                  currentUser.role === 'admin'
+                    ? 'bg-[#FFF1F2] text-[#C8102E] border border-[#FECDD3]'
+                    : 'bg-slate-100 text-[#1F2937] border border-[#E5E7EB]'
+                }`}
+              >
+                {currentUser.role === 'admin' ? 'Admin' : 'Investigator'}
+              </span>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="h-10 w-10 grid place-items-center rounded-xl text-[#6B7280] hover:bg-red-50 hover:text-[#C8102E] border border-transparent hover:border-red-100 transition cursor-pointer shrink-0"
+                title="Sign out of investigation session"
+                aria-label="Sign out"
+              >
+                <LogOut size={16} className="shrink-0" />
+              </button>
             </div>
           </div>
 
-          {/* Action Bar & User Profile */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {currentUser.role === 'admin' && (
-              <button
-                onClick={() => setShowAdminModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#FECDD3] bg-[#FFF1F2] px-3 py-1.5 text-xs font-semibold text-[#C8102E] transition hover:bg-[#FFE4E6]"
-                title="Manage user accounts and access permissions"
-              >
-                <Users size={14} className="text-[#C8102E]" />
-                <span className="hidden sm:inline">Access Permissions</span>
-              </button>
-            )}
-
-            {currentCase && (
-              <button
-                onClick={handleDownloadPdf}
-                disabled={isDownloadingPdf}
-                className="hidden items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs font-semibold text-[#1F2937] transition hover:border-[#C8102E] hover:text-[#C8102E] disabled:opacity-50 sm:flex shadow-2xs"
-                title="Download formal investigation report as PDF"
-              >
-                <FileDown size={14} className="text-[#C8102E]" />
-                {isDownloadingPdf ? 'Creating Report...' : 'Download Report'}
-              </button>
-            )}
-
+          {/* Mobile / Tablet Actions (< lg) */}
+          <div className="flex items-center gap-2 lg:hidden">
             <button
+              type="button"
               onClick={() => setShowNewCaseModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg btn-royal px-3.5 py-1.5 text-xs font-semibold shadow-xs transition"
+              className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl btn-royal text-xs font-semibold whitespace-nowrap shadow-xs transition cursor-pointer"
+              title="Start New Investigation"
             >
-              <Plus size={14} /> Start New Investigation
+              <Plus size={16} className="shrink-0" />
+              <span className="hidden sm:inline">New Case</span>
             </button>
 
-            {/* User Profile Pill */}
-            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-[#E5E7EB]">
-              <div className="hidden md:block text-right">
-                <div className="text-xs font-bold text-[#1F2937] leading-tight">{currentUser.display_name}</div>
-                <div className="text-[10px] text-[#6B7280] font-mono">@{currentUser.user_id}</div>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className={`h-10 w-10 grid place-items-center rounded-xl border transition cursor-pointer shrink-0 ${
+                mobileMenuOpen
+                  ? 'border-[#C8102E] bg-[#FFF1F2] text-[#C8102E]'
+                  : 'border-[#E5E7EB] bg-white text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E]'
+              }`}
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X size={18} className="shrink-0 text-[#C8102E]" /> : <Menu size={18} className="shrink-0" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile / Tablet Collapsible Menu Dropdown */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-[#E5E7EB] bg-white px-4 py-4 space-y-3 shadow-lg animate-fadeIn">
+            {/* User Profile Card in Mobile Menu */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[#F8FAFC] border border-[#E5E7EB]">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-8 place-items-center rounded-lg bg-white border border-[#E5E7EB] text-[#C8102E] shadow-2xs">
+                  <UserIcon size={16} className="shrink-0" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-[#1F2937]">{currentUser.display_name}</div>
+                  <div className="text-[10px] text-[#6B7280] font-mono">@{currentUser.user_id}</div>
+                </div>
               </div>
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                   currentUser.role === 'admin'
                     ? 'bg-[#FFF1F2] text-[#C8102E] border border-[#FECDD3]'
                     : 'bg-slate-100 text-[#1F2937] border border-[#E5E7EB]'
@@ -346,18 +424,86 @@ export default function App() {
               >
                 {currentUser.role === 'admin' ? 'Administrator' : 'Investigator'}
               </span>
+            </div>
+
+            {/* Navigation links in Mobile Menu */}
+            <div className="space-y-1.5">
+              {currentUser.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveView(activeView === 'activity_monitor' ? 'workspace' : 'activity_monitor')
+                    setMobileMenuOpen(false)
+                  }}
+                  className={`w-full flex items-center gap-2.5 h-11 px-3.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer border ${
+                    activeView === 'activity_monitor'
+                      ? 'bg-[#C8102E] text-white border-[#C8102E] shadow-2xs'
+                      : 'bg-white border-[#E5E7EB] text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E]'
+                  }`}
+                >
+                  <Activity size={16} className={`shrink-0 ${activeView === 'activity_monitor' ? 'text-white' : 'text-[#6B7280]'}`} />
+                  <span>Activity Monitor</span>
+                </button>
+              )}
+
+              {currentUser.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdminModal(true)
+                    setMobileMenuOpen(false)
+                  }}
+                  className="w-full flex items-center gap-2.5 h-11 px-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E] whitespace-nowrap transition cursor-pointer"
+                >
+                  <Users size={16} className="shrink-0 text-[#6B7280]" />
+                  <span>Access Permissions</span>
+                </button>
+              )}
+
+              {currentCase && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadPdf()
+                    setMobileMenuOpen(false)
+                  }}
+                  disabled={isDownloadingPdf}
+                  className="w-full flex items-center gap-2.5 h-11 px-3.5 rounded-xl border border-[#E5E7EB] bg-white text-xs font-semibold text-[#1F2937] hover:border-[#C8102E] hover:text-[#C8102E] whitespace-nowrap transition disabled:opacity-50 cursor-pointer"
+                >
+                  <FileDown size={16} className="shrink-0 text-[#6B7280]" />
+                  <span>{isDownloadingPdf ? 'Creating Report...' : 'Download Report'}</span>
+                </button>
+              )}
 
               <button
-                onClick={handleLogout}
-                className="rounded-lg p-1.5 text-[#6B7280] hover:bg-red-50 hover:text-[#C8102E] transition"
-                title="Sign out of investigation session"
-                aria-label="Sign out"
+                type="button"
+                onClick={() => {
+                  setShowNewCaseModal(true)
+                  setMobileMenuOpen(false)
+                }}
+                className="w-full flex items-center gap-2.5 h-11 px-3.5 rounded-xl btn-royal text-xs font-semibold whitespace-nowrap transition cursor-pointer"
               >
-                <LogOut size={16} />
+                <Plus size={16} className="shrink-0" />
+                <span>Start New Investigation</span>
+              </button>
+            </div>
+
+            {/* Mobile Sign out button */}
+            <div className="pt-2 border-t border-[#E5E7EB]">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false)
+                  handleLogout()
+                }}
+                className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-[#C8102E] transition cursor-pointer"
+              >
+                <LogOut size={16} className="shrink-0" />
+                <span>Sign Out</span>
               </button>
             </div>
           </div>
-        </div>
+        )}
       </header>
 
       {/* Main Container */}
