@@ -39,7 +39,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       } else if (status === 403) {
         setErrorMessage(detail || 'This account has been disabled or locked. Please reach out to your administrator.');
       } else if (err.code === 'ERR_NETWORK' || !err.response) {
-        setErrorMessage('Unable to reach the investigation service. Please check your network connection.');
+        setErrorMessage(`Unable to reach the investigation backend at ${api.getBaseUrl()}. Please ensure the backend server is running (e.g. 'uvicorn app.main:app --port 8000' in backend) or configure VITE_API_URL in .env.`);
       } else {
         setErrorMessage(detail || 'Authentication failed. Please verify your credentials.');
       }
@@ -67,7 +67,11 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       onLoginSuccess(res.user);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
-      setErrorMessage(detail || 'Initial setup failed. An administrator may already exist or the security key was invalid.');
+      if (err.code === 'ERR_NETWORK' || !err.response) {
+        setErrorMessage(`Unable to reach the investigation backend at ${api.getBaseUrl()}. Please ensure the backend server is running or configure VITE_API_URL in .env.`);
+      } else {
+        setErrorMessage(detail || 'Initial setup failed. An administrator may already exist or the security key was invalid.');
+      }
     } finally {
       setLoading(false);
     }

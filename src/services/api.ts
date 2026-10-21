@@ -40,6 +40,10 @@ client.interceptors.response.use(
 
 export const api = {
   // Session & Auth State Management
+  getBaseUrl(): string {
+    return API_BASE_URL;
+  },
+
   setUnauthorizedHandler(handler: () => void) {
     onUnauthorizedHandler = handler;
   },

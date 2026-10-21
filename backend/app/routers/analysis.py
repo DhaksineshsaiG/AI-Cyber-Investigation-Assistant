@@ -246,36 +246,18 @@ async def get_case_dashboard(
     evidence_col = get_collection("evidence")
 
     cached_analysis = await analysis_col.find_one({"case_id": case_id})
+    ev_count = await evidence_col.count_documents({"case_id": case_id})
+
     if cached_analysis:
-        cached_ai = cached_analysis.get("ai_insights", {})
-        cached_docs = cached_analysis.get("stats", {}).get("documents", 0)
-        cached_entities = cached_analysis.get("stats", {}).get("key_entities", 0)
-        groq_ready = bool(settings.GROQ_API_KEY and settings.GROQ_API_KEY.strip() != "your_groq_api_key_here")
-        ev_count = await evidence_col.count_documents({"case_id": case_id})
-
-        needs_refresh = False
-        if ev_count > 0 and (cached_docs < ev_count or cached_entities == 0):
-            needs_refresh = True
-        elif not cached_ai.get("is_available", False) and groq_ready and ev_count > 0:
-            needs_refresh = True
-
-        if needs_refresh:
-            logger.info(f"Cached analysis for case {case_id} needs refresh (ev_count={ev_count}, docs={cached_docs}, entities={cached_entities}). Re-running forensic pipeline...")
-            try:
-                return await run_case_analysis(case_id, current_user)
-            except Exception as e:
-                logger.warning(f"Auto-refreshing analysis failed ({e}); serving existing cached analysis.")
-
-
         return DashboardResponse(
             case_id=cached_analysis["case_id"],
-            title=cached_analysis["title"],
+            title=cached_analysis.get("title", case.get("title", "")),
             investigator=cached_analysis.get("investigator", case.get("investigator", "")),
-            status=cached_analysis.get("status", "ACTIVE"),
-            evidence_count=cached_analysis.get("evidence_count", 0),
-            stats=DashboardStats(**cached_analysis["stats"]),
-            summary=cached_analysis["summary"],
-            sources_reviewed_label=cached_analysis["sources_reviewed_label"],
+            status=cached_analysis.get("status", case.get("status", "ACTIVE")),
+            evidence_count=ev_count,
+            stats=DashboardStats(**cached_analysis.get("stats", {"documents": 0, "key_entities": 0, "risk_signals": 0})),
+            summary=cached_analysis.get("summary", ""),
+            sources_reviewed_label=cached_analysis.get("sources_reviewed_label", f"{ev_count} source{'s' if ev_count != 1 else ''} reviewed"),
             keywords=[KeywordItem(**kw) for kw in cached_analysis.get("keywords", [])],
             entity_groups=[EntityGroup(**eg) for eg in cached_analysis.get("entity_groups", [])],
             timeline=[TimelineItem(**t) for t in cached_analysis.get("timeline", [])],
@@ -283,31 +265,31 @@ async def get_case_dashboard(
             ai_insights=AIInsightData(**cached_analysis.get("ai_insights", {}))
         )
 
-    # If no analysis yet, check if evidence exists
-    ev_count = await evidence_col.count_documents({"case_id": case_id})
-    if ev_count > 0:
-        return await run_case_analysis(case_id, current_user)
-
-    # Empty initial state
+    # Empty initial state (awaiting investigator to trigger analysis via POST /api/cases/{case_id}/analyze)
+    summary_text = (
+        f"{ev_count} evidence file(s) uploaded. Click 'Investigate Evidence' to run automated forensic extraction and AI analysis."
+        if ev_count > 0
+        else "Awaiting digital evidence upload. Add files to begin automated forensic analysis."
+    )
     return DashboardResponse(
         case_id=case_id,
         title=case.get("title", ""),
         investigator=case.get("investigator", "Primary Investigator"),
         status=case.get("status", "ACTIVE"),
-        evidence_count=0,
+        evidence_count=ev_count,
         stats=DashboardStats(documents=0, key_entities=0, risk_signals=0),
-        summary="Awaiting digital evidence upload. Add files to begin automated forensic analysis.",
-        sources_reviewed_label="0 sources reviewed",
+        summary=summary_text,
+        sources_reviewed_label=f"{ev_count} source{'s' if ev_count != 1 else ''} uploaded" if ev_count > 0 else "0 sources reviewed",
         keywords=[],
         entity_groups=[],
         timeline=[],
         correlations=[],
         ai_insights=AIInsightData(
-            summary="No evidence uploaded yet.",
+            summary="Evidence uploaded and awaiting investigation. Click 'Investigate Evidence' to begin." if ev_count > 0 else "No evidence uploaded yet.",
             findings=[],
             patterns=[],
             leads=[],
-            confidence_note="Awaiting data",
+            confidence_note="Awaiting investigation trigger" if ev_count > 0 else "Awaiting data",
             is_available=False
         )
     )

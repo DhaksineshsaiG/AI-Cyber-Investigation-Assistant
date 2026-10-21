@@ -77,11 +77,11 @@ def perform_ocr(image_input: Union[str, bytes, bytearray, Image.Image]) -> Tuple
 
         try:
             processed = preprocess_image(img)
-            text = pytesseract.image_to_string(processed, lang='eng', config='--psm 11')
+            text = pytesseract.image_to_string(processed, lang='eng', config='--psm 11', timeout=20)
             cleaned_text = text.strip()
             if not cleaned_text:
                 # Try raw image without extra pre-processing
-                text = pytesseract.image_to_string(img)
+                text = pytesseract.image_to_string(img, timeout=20)
                 cleaned_text = text.strip()
             
             return cleaned_text, True, "OCR completed successfully"

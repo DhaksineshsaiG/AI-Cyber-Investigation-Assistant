@@ -43,7 +43,7 @@ def generate_ai_insights(
     try:
         from groq import Groq
 
-        client = Groq(api_key=api_key)
+        client = Groq(api_key=api_key, timeout=25.0)
 
         # Prepare sanitized evidence context
         evidence_context = {
@@ -97,11 +97,12 @@ def generate_ai_insights(
 
         candidate_models = []
         if settings.GROQ_MODEL and settings.GROQ_MODEL.strip():
-            candidate_models.append(settings.GROQ_MODEL.strip())
+            configured_model = settings.GROQ_MODEL.strip()
+            # Avoid invalid experimental or non-Groq prefixes in production
+            if not configured_model.startswith("openai/"):
+                candidate_models.append(configured_model)
+
         for fallback in [
-            "openai/gpt-oss-120b",
-            "openai/gpt-oss-20b",
-            "qwen/qwen3.8-27b",
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant"
         ]:
@@ -123,7 +124,8 @@ def generate_ai_insights(
                     ],
                     response_format={"type": "json_object"},
                     temperature=0.2,
-                    max_tokens=1500
+                    max_tokens=1500,
+                    timeout=25.0
                 )
                 used_model = candidate
                 logger.info(f"Successfully generated Groq analysis using model: {candidate}")
@@ -131,8 +133,8 @@ def generate_ai_insights(
             except Exception as model_err:
                 err_str = str(model_err).lower()
                 last_error = model_err
-                if any(x in err_str for x in ["model_not_found", "does not exist", "404", "access"]):
-                    logger.warning(f"Groq model '{candidate}' unavailable ({model_err}). Trying fallback...")
+                if any(x in err_str for x in ["model_not_found", "does not exist", "404", "access", "timeout", "timed out"]):
+                    logger.warning(f"Groq model '{candidate}' unavailable or timed out ({model_err}). Trying fallback...")
                     continue
                 else:
                     raise model_err
